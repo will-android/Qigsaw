@@ -26,6 +26,7 @@ package com.iqiyi.android.qigsaw.core;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Resources;
@@ -44,7 +45,7 @@ import com.iqiyi.android.qigsaw.core.common.SplitAABInfoProvider;
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import com.iqiyi.android.qigsaw.core.extension.AABExtension;
 import com.iqiyi.android.qigsaw.core.splitdownload.Downloader;
-import com.iqiyi.android.qigsaw.core.splitinstall.SplitDownloaderManager;
+import com.iqiyi.android.qigsaw.core.splitinstall.SplitApkInstaller;
 import com.iqiyi.android.qigsaw.core.splitinstall.SplitInstallReporterManager;
 import com.iqiyi.android.qigsaw.core.splitload.SplitLoadManager;
 import com.iqiyi.android.qigsaw.core.splitload.SplitLoadManagerService;
@@ -87,6 +88,8 @@ public class Qigsaw {
         SplitLoadReporter loadReporter = null;
         SplitUpdateReporter updateReporter = null;
         SplitLog.Logger logger = null;
+        Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass = null;
+        boolean loadInstalledSplitsOnApplicationCreate = false;
         if (configuration != null) {
             manifestPackageName = configuration.getManifestPackageName();
             workProcesses = configuration.getWorkProcesses();
@@ -94,54 +97,64 @@ public class Qigsaw {
             loadReporter = configuration.getLoadReporter();
             updateReporter = configuration.getUpdateReporter();
             logger = configuration.getLogger();
+            obtainUserConfirmationDialogClass = configuration.obtainUserConfirmationDialogClass();
+            loadInstalledSplitsOnApplicationCreate = configuration.loadInstalledSplitsOnApplicationCreate();
+        }
+        final Context baseContext = getBaseContext(context);
+        boolean isMainProcess = ProcessUtil.isMainProcess(baseContext);
+        installReporter(baseContext, isMainProcess, installReporter, loadReporter, updateReporter);
+        //set custom logger
+        if (logger != null) {
+            SplitLog.setSplitLogImp(logger);
         }
         if (TextUtils.isEmpty(manifestPackageName)) {
             manifestPackageName = context.getPackageName();
         }
-        if (logger != null) {
-            SplitLog.setSplitLogImp(logger);
-        }
-        final Context appContext = getApplicationContext(context);
         SplitBaseInfoProvider.setPackageName(manifestPackageName);
         //create AABCompat instance
-        AABExtension.install(appContext);
-        //create SplitLoadManager instance.
-        SplitLoadManagerService.install(appContext);
-        if (loadReporter == null) {
-            loadReporter = new DefaultSplitLoadReporter(appContext);
-        }
-        SplitLoadReporterManager.install(loadReporter);
-        SplitLoadManager loadManager = SplitLoadManagerService.getInstance();
-        //load all installed splits for qigsaw.
-        loadManager.load(workProcesses, !isSplitAppComponentFactoryExisting(appContext));
-        //getInstance all installed splits for AAB.
-        SplitAABInfoProvider infoProvider = new SplitAABInfoProvider(appContext);
-        Set<String> loadedSplits = infoProvider.getInstalledSplitsForAAB();
+        AABExtension.install(baseContext);
+        //get all installed splits for AAB.
+        SplitAABInfoProvider infoProvider = new SplitAABInfoProvider(baseContext);
         //if installed splits of aab are not empty, qigsaw would not work.
-        if (loadedSplits.isEmpty()) {
-            loadedSplits = loadManager.getLoadedSplitNames();
-        }
-        AABExtension.getInstance().onBaseContextAttached(loadedSplits);
+        Set<String> aabLoadedSplits = infoProvider.getInstalledSplitsForAAB();
+        boolean isAAB = !aabLoadedSplits.isEmpty();
+        SplitLoadManagerService.install(baseContext, workProcesses, loadInstalledSplitsOnApplicationCreate, isAAB);
+        SplitLoadManager loadManager = SplitLoadManagerService.getInstance();
+        loadManager.injectPathClassloaderIfNeed(!isSplitAppComponentFactoryExisting(baseContext));
+        AABExtension.getInstance().onBaseContextAttached(aabLoadedSplits);
         //only work in main process!
-        if (ProcessUtil.isMainProcess(appContext)) {
-            if (installReporter == null) {
-                installReporter = new DefaultSplitInstallReporter(appContext);
-            }
-            if (updateReporter == null) {
-                updateReporter = new DefaultSplitUpdateReporter(appContext);
-            }
-            SplitInstallReporterManager.install(installReporter);
-            SplitUpdateReporterManager.install(updateReporter);
-            SplitDownloaderManager.install(downloader);
+        if (isMainProcess) {
+            SplitApkInstaller.install(baseContext, downloader, obtainUserConfirmationDialogClass);
             Looper.myQueue().addIdleHandler(new MessageQueue.IdleHandler() {
                 @Override
                 public boolean queueIdle() {
-                    cleanStaleSplits(appContext);
+                    cleanStaleSplits(baseContext);
                     return false;
                 }
             });
         }
-        SplitCompat.install(appContext);
+        SplitCompat.install(baseContext);
+    }
+
+    private static void installReporter(Context context,
+                                        boolean isMainProcess,
+                                        SplitInstallReporter installReporter,
+                                        SplitLoadReporter loadReporter,
+                                        SplitUpdateReporter updateReporter) {
+        if (isMainProcess) {
+            if (installReporter == null) {
+                installReporter = new DefaultSplitInstallReporter(context);
+            }
+            if (updateReporter == null) {
+                updateReporter = new DefaultSplitUpdateReporter(context);
+            }
+            SplitInstallReporterManager.install(installReporter);
+            SplitUpdateReporterManager.install(updateReporter);
+        }
+        if (loadReporter == null) {
+            loadReporter = new DefaultSplitLoadReporter(context);
+        }
+        SplitLoadReporterManager.install(loadReporter);
     }
 
     /**
@@ -149,6 +162,9 @@ public class Qigsaw {
      */
     public static void onApplicationCreated() {
         AABExtension.getInstance().onCreate();
+        if (SplitLoadManagerService.hasInstance()) {
+            SplitLoadManagerService.getInstance().onCreate();
+        }
     }
 
     /**
@@ -198,14 +214,12 @@ public class Qigsaw {
         }
     }
 
-    private static Context getApplicationContext(Context context) {
-        Context appContext;
-        if (context.getApplicationContext() == null) {
-            appContext = context;
-        } else {
-            appContext = context.getApplicationContext();
+    private static Context getBaseContext(Context context) {
+        Context ctx = context;
+        while (ctx instanceof ContextWrapper) {
+            ctx = ((ContextWrapper) ctx).getBaseContext();
         }
-        return appContext;
+        return ctx;
     }
 
     private static boolean isSplitAppComponentFactoryExisting(Context context) {

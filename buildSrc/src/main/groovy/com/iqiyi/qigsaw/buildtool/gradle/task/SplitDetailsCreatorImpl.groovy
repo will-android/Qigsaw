@@ -30,10 +30,12 @@ import com.google.gson.Gson
 import com.iqiyi.qigsaw.buildtool.gradle.internal.splits.SplitDetails
 import com.iqiyi.qigsaw.buildtool.gradle.internal.splits.SplitDetailsCreator
 import com.iqiyi.qigsaw.buildtool.gradle.internal.splits.SplitInfo
+import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.AGPCompat
 import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.FileUtils
 import com.iqiyi.qigsaw.buildtool.gradle.upload.SplitApkUploader
 import com.iqiyi.qigsaw.buildtool.gradle.upload.SplitApkUploaderInstance
 import org.gradle.api.Project
+import org.gradle.api.Task
 
 class SplitDetailsCreatorImpl implements SplitDetailsCreator {
 
@@ -96,7 +98,8 @@ class SplitDetailsCreatorImpl implements SplitDetailsCreator {
         appProject.extensions.android.applicationVariants.each {
             ApplicationVariant appVariant = it
             if (appVariant.name.equalsIgnoreCase(variantName)) {
-                outputDir = appVariant.getPackageApplicationProvider().get().outputDirectory
+                Task packageApplicationTask = AGPCompat.getPackageApplication(appVariant)
+                outputDir = packageApplicationTask.outputDirectory
             }
         }
         if (outputDir != null) {
@@ -151,7 +154,7 @@ class SplitDetailsCreatorImpl implements SplitDetailsCreator {
             } else {
                 String uploadedUrl = uploader.uploadSync(appProject, splitInfo.splitApk, splitInfo.splitName)
                 if (uploadedUrl != null && uploadedUrl.startsWith("http")) {
-                    splitInfo.url = uploader.uploadSync(appProject, splitInfo.splitApk, splitInfo.splitName)
+                    splitInfo.url = uploadedUrl
                     return
                 }
             }
@@ -184,7 +187,12 @@ class SplitDetailsCreatorImpl implements SplitDetailsCreator {
                 for (SplitInfo appliedInfo : appliedSplitDetails.splits) {
                     if (info.splitName.equals(appliedInfo.splitName)) {
                         if (info.version.equals(appliedInfo.version)) {
-                            info.url = appliedInfo.url
+                            if (info.md5.equals(appliedInfo.md5)) {
+                                info.url = appliedInfo.url
+                            } else {
+                                uploadSplitAPKIfNeed(info)
+                                appProject.logger.error(String.format("Split %s md5 has been changed, but version is not changed!!!!", info.splitName))
+                            }
                         } else {
                             info.builtIn = false
                             updateSplits.add(info.splitName)

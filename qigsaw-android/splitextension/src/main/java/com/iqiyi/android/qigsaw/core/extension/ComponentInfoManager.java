@@ -39,8 +39,6 @@ final class ComponentInfoManager {
 
     private static final String RECEIVERS_SUFFIX = "_RECEIVERS";
 
-    private static final String PROVIDERS_SUFFIX = "_PROVIDERS";
-
     private static final String APPLICATION_SUFFIX = "_APPLICATION";
 
     private static Class getComponentInfoClass() throws ClassNotFoundException {
@@ -48,7 +46,7 @@ final class ComponentInfoManager {
     }
 
     static String getSplitApplication(String splitName) {
-        String fieldName = splitName.toUpperCase() + APPLICATION_SUFFIX;
+        String fieldName = splitName + APPLICATION_SUFFIX;
         try {
             Field field = getComponentInfoClass().getField(fieldName);
             field.setAccessible(true);
@@ -64,7 +62,7 @@ final class ComponentInfoManager {
     }
 
     static String[] getSplitActivities(String splitName) {
-        String fieldName = splitName.toUpperCase() + ACTIVITIES_SUFFIX;
+        String fieldName = splitName + ACTIVITIES_SUFFIX;
         try {
             Field field = getComponentInfoClass().getField(fieldName);
             field.setAccessible(true);
@@ -83,7 +81,7 @@ final class ComponentInfoManager {
     }
 
     static String[] getSplitServices(String splitName) {
-        String fieldName = splitName.toUpperCase() + SERVICES_SUFFIX;
+        String fieldName = splitName + SERVICES_SUFFIX;
         try {
             Field field = getComponentInfoClass().getField(fieldName);
             field.setAccessible(true);
@@ -102,26 +100,7 @@ final class ComponentInfoManager {
     }
 
     static String[] getSplitReceivers(String splitName) {
-        String fieldName = splitName.toUpperCase() + RECEIVERS_SUFFIX;
-        try {
-            Field field = getComponentInfoClass().getField(fieldName);
-            field.setAccessible(true);
-            String result = (String) field.get(null);
-            if (result != null) {
-                return result.split(",");
-            }
-        } catch (NoSuchFieldException e) {
-            //
-        } catch (IllegalAccessException e) {
-            //
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    static String[] getSplitProviders(String splitName) {
-        String fieldName = splitName.toUpperCase() + PROVIDERS_SUFFIX;
+        String fieldName = splitName + RECEIVERS_SUFFIX;
         try {
             Field field = getComponentInfoClass().getField(fieldName);
             field.setAccessible(true);

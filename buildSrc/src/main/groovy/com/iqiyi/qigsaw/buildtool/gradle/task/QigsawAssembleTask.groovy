@@ -29,9 +29,12 @@ import com.android.build.gradle.AppExtension
 import com.android.build.gradle.api.ApplicationVariant
 import com.iqiyi.qigsaw.buildtool.gradle.internal.splits.SplitDetailsCreator
 import com.iqiyi.qigsaw.buildtool.gradle.internal.splits.SplitInfo
+import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.AGPCompat
 import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.FileUtils
+import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.TopoSort
 import org.gradle.api.DefaultTask
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.tasks.TaskAction
 
 import javax.inject.Inject
@@ -49,6 +52,8 @@ class QigsawAssembleTask extends DefaultTask {
     String qigsawId
 
     String versionName
+
+    Map<String, List<String>> dynamicFeatureDependenciesMap
 
     @Inject
     QigsawAssembleTask(File assetsDir,
@@ -72,7 +77,7 @@ class QigsawAssembleTask extends DefaultTask {
     }
 
     void processSplitAPKsInternal() {
-        List<SplitInfo> splits = new ArrayList<>(dynamicFeatures.size())
+        Map<String, SplitInfo> splitInfoMap = new HashMap<>()
         //get version name and version code of base app project!
         for (String dynamicFeature : dynamicFeatures) {
             Project dynamicFeatureProject = project.rootProject.project(dynamicFeature)
@@ -80,27 +85,26 @@ class QigsawAssembleTask extends DefaultTask {
             AppExtension android = dynamicFeatureProject.extensions.getByType(AppExtension)
             File splitApk = null
             File splitManifest = null
+
             android.applicationVariants.all { variant ->
                 ApplicationVariant appVariant = variant
-                if (appVariant.assembleProvider.name.endsWith(variantName)) {
+                Task assembleTask = AGPCompat.getAssemble(appVariant)
+                if (assembleTask.name.endsWith(variantName)) {
                     appVariant.outputs.each {
                         splitApk = it.outputFile
-                        it.processManifestProvider.get().outputs.files.each {
-                            if (it.isDirectory() && it.getParentFile().name.equals("merged_manifests")) {
-                                splitManifest = new File(it, "AndroidManifest.xml")
-                            }
-                        }
+                        File mergedManifestDir = AGPCompat.getMergedManifestDirCompat(dynamicFeatureProject, appVariant.name.capitalize())
+                        splitManifest = new File(mergedManifestDir, "AndroidManifest.xml")
                     }
                 }
             }
             if (splitApk == null || splitManifest == null) {
-                throw new RuntimeException("Can not find output files of " + dynamicFeature)
+                throw new RuntimeException("Can not find output files of " + dynamicFeature + " " + splitApk + " " + splitManifest)
             }
-            SplitProcessorImpl splitProcessor = new SplitProcessorImpl(project, android, variantName)
+            SplitProcessorImpl splitProcessor = new SplitProcessorImpl(project, android, variantName, dynamicFeatureDependenciesMap)
             //sign split apk if needed
             File splitSignedApk = splitProcessor.signSplitAPKIfNeed(splitApk)
             SplitInfo splitInfo = splitProcessor.createSplitInfo(splitName, splitSignedApk, splitManifest)
-            splits.add(splitInfo)
+            splitInfoMap.put(splitInfo.splitName, splitInfo)
         }
         SplitDetailsCreator detailsCreator = new SplitDetailsCreatorImpl(
                 getProject(),
@@ -108,6 +112,31 @@ class QigsawAssembleTask extends DefaultTask {
                 versionName,
                 qigsawId
         )
+        Map<String, TopoSort.Node> nodeMap = new HashMap<>()
+        TopoSort.Graph graph = new TopoSort.Graph()
+        Collection<SplitInfo> allSplits = splitInfoMap.values()
+        for (SplitInfo info : allSplits) {
+            if (nodeMap.get(info.splitName) == null) {
+                nodeMap.put(info.splitName, new TopoSort.Node(info))
+            }
+            if (info.dependencies != null) {
+                for (String dependency : info.dependencies) {
+                    if (nodeMap.get(dependency) == null) {
+                        nodeMap.put(dependency, new TopoSort.Node(splitInfoMap.get(dependency)))
+                    }
+                    graph.addNode(nodeMap.get(info.splitName), nodeMap.get(dependency))
+                }
+            }
+        }
+        TopoSort.KahnTopo topo = new TopoSort.KahnTopo(graph)
+        topo.process()
+        List<SplitInfo> splits = new ArrayList<>(dynamicFeatures.size())
+        for (int i = topo.result.size() - 1; i >= 0; i--) {
+            SplitInfo info = topo.result.get(i).val
+            splitInfoMap.remove(info.splitName)
+            splits.add(info)
+        }
+        splits.addAll(splitInfoMap.values())
         File splitDetailsFile = detailsCreator.createSplitDetailsJsonFile(splits)
         copyQigsawOutputsToAssetsDir(splits, splitDetailsFile)
     }

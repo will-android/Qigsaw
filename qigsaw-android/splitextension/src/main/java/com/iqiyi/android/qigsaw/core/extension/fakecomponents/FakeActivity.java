@@ -22,30 +22,21 @@
  * SOFTWARE.
  */
 
-package com.iqiyi.android.qigsaw.core.splitinstall;
+package com.iqiyi.android.qigsaw.core.extension.fakecomponents;
 
-import android.support.annotation.NonNull;
+import android.app.Activity;
+import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.annotation.RestrictTo;
-
-import com.iqiyi.android.qigsaw.core.splitdownload.Downloader;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
-public class SplitDownloaderManager {
+public class FakeActivity extends Activity {
 
-    private static final AtomicReference<Downloader> sDownloaderRef = new AtomicReference<>();
-
-    public static void install(@NonNull Downloader downloader) {
-        sDownloaderRef.compareAndSet(null, downloader);
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        finish();
     }
-
-    @Nullable
-    static Downloader getDownloader() {
-        return sDownloaderRef.get();
-    }
-
 }

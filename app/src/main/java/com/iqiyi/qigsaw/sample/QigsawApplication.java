@@ -25,14 +25,14 @@ public class QigsawApplication extends Application {
                 //qigsaw splits will only in main and qigsaw processes.
                 .workProcesses(workProcesses)
                 .logger(new SampleLogger())
-                .manifestPackageName(base.getPackageName())
                 .loadReporter(new SampleSplitLoadReporter(this))
+                .manifestPackageName(base.getPackageName())
                 .installReporter(new SampleSplitInstallReporter(this))
                 .updateReporter(new SampleSplitUpdateReporter(this))
+                .obtainUserConfirmationDialogClass(SampleObtainUserConfirmationDialog.class)
+                .loadInstalledSplitsOnApplicationCreate(true)
                 .build();
-        Qigsaw.install(this,
-                new SampleDownloader(),
-                configuration);
+        Qigsaw.install(this, new SampleDownloader(), configuration);
     }
 
     @Override

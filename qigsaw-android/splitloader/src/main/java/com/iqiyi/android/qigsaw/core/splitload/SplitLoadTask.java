@@ -25,6 +25,8 @@
 package com.iqiyi.android.qigsaw.core.splitload;
 
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.util.ArraySet;
@@ -38,6 +40,7 @@ import com.iqiyi.android.qigsaw.core.splitreport.SplitLoadReporter;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -53,25 +56,46 @@ final class SplitLoadTask implements Runnable {
 
     private final SplitActivator splitActivator;
 
-    private final boolean processStarting;
+    private final Object mLock = new Object();
+
+    private final List<String> moduleNames;
 
     SplitLoadTask(SplitLoadManager loadManager,
                   @NonNull List<Intent> splitFileIntents,
-                  @Nullable OnSplitLoadListener loadListener,
-                  boolean processStarting) {
+                  @Nullable OnSplitLoadListener loadListener) {
         this.loadManager = loadManager;
-        this.processStarting = processStarting;
         this.splitActivator = new SplitActivator(AABExtension.getInstance());
         this.splitFileIntents = splitFileIntents;
         this.loadListener = loadListener;
+        this.moduleNames = getRequestModuleNames();
     }
 
     @Override
     public void run() {
-        loadSplits();
+        if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+            loadSplits();
+        } else {
+            synchronized (mLock) {
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        synchronized (mLock) {
+                            loadSplits();
+                            mLock.notifyAll();
+                        }
+                    }
+                });
+                try {
+                    mLock.wait();
+                } catch (InterruptedException e) {
+                    List<SplitLoadError> errors = Collections.singletonList(new SplitLoadError(moduleNames.get(0), SplitLoadError.INTERRUPTED_ERROR, e));
+                    reportLoadResult(errors, 0);
+                }
+            }
+        }
     }
 
-    private synchronized void loadSplits() {
+    private void loadSplits() {
         long lastTimeMillis = System.currentTimeMillis();
         SplitLoader loader = new SplitLoaderImpl(loadManager.getContext());
         Set<Split> splits = new ArraySet<>(splitFileIntents.size());
@@ -113,41 +137,32 @@ final class SplitLoadTask implements Runnable {
             }
         }
         loadManager.putSplits(splits);
-        if (loadListener != null) {
-            if (errors.isEmpty()) {
-                loadListener.onCompleted();
-            } else {
+        reportLoadResult(errors, System.currentTimeMillis() - lastTimeMillis);
+    }
+
+    private void reportLoadResult(List<SplitLoadError> errors, long cost) {
+        SplitLoadReporter loadReporter = SplitLoadReporterManager.getLoadReporter();
+        if (!errors.isEmpty()) {
+            if (loadListener != null) {
                 int lastErrorCode = errors.get(errors.size() - 1).getErrorCode();
                 loadListener.onFailed(lastErrorCode);
             }
-        }
-        SplitLoadReporter loadReporter = SplitLoadReporterManager.getLoadReporter();
-        List<String> requestModuleNames = getRequestModuleNames();
-        if (errors.isEmpty()) {
-            if (processStarting) {
-                if (loadReporter != null) {
-                    loadReporter.onLoadOKUnderProcessStarting(requestModuleNames, loadManager.getCurrentProcessName(), System.currentTimeMillis() - lastTimeMillis);
-                }
-            } else {
-                if (loadReporter != null) {
-                    loadReporter.onLoadOKUnderUserTriggering(requestModuleNames, loadManager.getCurrentProcessName(), System.currentTimeMillis() - lastTimeMillis);
-                }
+            if (loadReporter != null) {
+                loadReporter.onLoadFailed(moduleNames, loadManager.getCurrentProcessName(), errors, cost);
             }
+
         } else {
-            if (processStarting) {
-                if (loadReporter != null) {
-                    loadReporter.onLoadFailedUnderProcessStarting(requestModuleNames, loadManager.getCurrentProcessName(), errors, System.currentTimeMillis() - lastTimeMillis);
-                }
-            } else {
-                if (loadReporter != null) {
-                    loadReporter.onLoadFailedUnderUserTriggering(requestModuleNames, loadManager.getCurrentProcessName(), errors, System.currentTimeMillis() - lastTimeMillis);
-                }
+            if (loadListener != null) {
+                loadListener.onCompleted();
+            }
+            if (loadReporter != null) {
+                loadReporter.onLoadOK(moduleNames, loadManager.getCurrentProcessName(), cost);
             }
         }
     }
 
     private List<String> getRequestModuleNames() {
-        List<String> requestModuleNames = new ArrayList<>(0);
+        List<String> requestModuleNames = new ArrayList<>(splitFileIntents.size());
         for (Intent intent : splitFileIntents) {
             requestModuleNames.add(intent.getStringExtra(SplitConstants.KET_NAME));
         }

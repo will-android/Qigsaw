@@ -47,9 +47,11 @@ public class SplitLoadError {
     public static final int ACTIVATE_APPLICATION_FAILED = -24;
 
     /**
-     * Installing split providers failed.
+     * Activating split providers failed.
      */
-    public static final int INSTALL_PROVIDERS_FAILED = -25;
+    public static final int ACTIVATE_PROVIDERS_FAILED = -25;
+
+    public static final int INTERRUPTED_ERROR = -26;
 
     private final String moduleName;
 

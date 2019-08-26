@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.1.3-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.1.4-red.svg?style=flat)
 
 Qigsaw是一套基于[Android App Bundles](https://developer.android.com/guide/app-bundle/)实现的Android动态组件化方案，它无需应用重新安装即可动态分发插件。
 
@@ -15,7 +15,7 @@ Qigsaw是一套基于[Android App Bundles](https://developer.android.com/guide/a
 ```
 buildscript {
     dependencies {
-        classpath 'com.iqiyi.android.qigsaw:gradle-plugin:1.1.3'
+        classpath 'com.iqiyi.android.qigsaw:gradle-plugin:1.1.4'
     }
 }
 ```
@@ -25,7 +25,7 @@ buildscript {
 ```
 dependencies {
     //qigsaw core lib
-    implementation "com.iqiyi.android.qigsaw:splitcore:1.1.3"
+    implementation "com.iqiyi.android.qigsaw:splitcore:1.1.4"
 }
 ...
 ...
@@ -40,7 +40,7 @@ apply plugin: 'com.iqiyi.qigsaw.dynamicfeature'
 
 考虑到每个应用程序都有自己的下载器，qigsaw只提供下载接口，交由接入方实现。从[SampleDownloader](./app/src/main/java/com/iqiyi/qigsaw/sample/downloader/SampleDownloader.java)示例中了解更多信息。
 
-Qigsaw-gradle-plugin会在编译期间上传需要动态加载的split APK，因此您必须实现SplitApkUploader才能将split APK上传到您的CND服务器。从[SampleSplitApkUploader](./app/src/main/groovy/com/iqiyi/qigsaw/buildtool/gradle/sample/upload/SampleSplitApkUploader.groovy)示例中了解更多信息。
+Qigsaw-gradle-plugin会在编译期间上传需要动态加载的split APK，因此您必须实现SplitApkUploader才能将split APK上传到您的CND服务器。从[SampleSplitApkUploader](./qigsaw-android-sample/buildSrc/src/main/groovy/com/iqiyi/qigsaw/buildtool/gradle/sample/upload/SampleSplitApkUploader.groovy)示例中了解更多信息。
 
 如何安装qigsaw？从[QigsawApplication](./app/src/main/java/com/iqiyi/qigsaw/sample/QigsawApplication.java)示例中了解更多信息。
 

@@ -63,7 +63,7 @@ abstract class SplitInstaller {
      * @param splitApk  file of split apk.
      * @return a list of extracted dex files
      */
-    protected abstract List<File> extractMultiDex(SplitInfo info, File splitApk) throws InstallException;
+    protected abstract List<File> extractMultiDex(SplitInfo splitInfo, File splitApk) throws InstallException;
 
     /**
      * Extract split native library files.
@@ -108,18 +108,22 @@ abstract class SplitInstaller {
 
         final List<File> multiDexFiles;
 
+        final boolean dependenciesInstalled;
+
         InstallResult(@NonNull String splitName,
                       @NonNull File splitDir,
                       @NonNull File apkFile,
                       @Nullable File optDir,
                       @Nullable File libFile,
-                      @Nullable List<File> multiDexFiles) {
+                      @Nullable List<File> multiDexFiles,
+                      boolean dependenciesInstalled) {
             this.splitName = splitName;
             this.splitDir = splitDir;
             this.apkFile = apkFile;
             this.optDir = optDir;
             this.libFile = libFile;
             this.multiDexFiles = multiDexFiles;
+            this.dependenciesInstalled = dependenciesInstalled;
         }
     }
 

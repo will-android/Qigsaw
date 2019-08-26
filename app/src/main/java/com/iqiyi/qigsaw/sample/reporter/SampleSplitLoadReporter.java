@@ -14,22 +14,13 @@ public class SampleSplitLoadReporter extends DefaultSplitLoadReporter {
     }
 
     @Override
-    public void onLoadOKUnderProcessStarting(List<String> requestModuleNames, String processName, long cost) {
-        super.onLoadOKUnderProcessStarting(requestModuleNames, processName, cost);
+    public void onLoadOK(List<String> requestModuleNames, String processName, long cost) {
+        super.onLoadOK(requestModuleNames, processName, cost);
     }
 
     @Override
-    public void onLoadFailedUnderProcessStarting(List<String> requestModuleNames, String processName, List<SplitLoadError> errors, long cost) {
-        super.onLoadFailedUnderProcessStarting(requestModuleNames, processName, errors, cost);
+    public void onLoadFailed(List<String> requestModuleNames, String processName, List<SplitLoadError> errors, long cost) {
+        super.onLoadFailed(requestModuleNames, processName, errors, cost);
     }
 
-    @Override
-    public void onLoadOKUnderUserTriggering(List<String> requestModuleNames, String processName, long cost) {
-        super.onLoadOKUnderUserTriggering(requestModuleNames, processName, cost);
-    }
-
-    @Override
-    public void onLoadFailedUnderUserTriggering(List<String> requestModuleNames, String processName, List<SplitLoadError> errors, long cost) {
-        super.onLoadFailedUnderUserTriggering(requestModuleNames, processName, errors, cost);
-    }
 }

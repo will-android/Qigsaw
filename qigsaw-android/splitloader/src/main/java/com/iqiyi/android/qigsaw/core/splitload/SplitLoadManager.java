@@ -56,15 +56,23 @@ public abstract class SplitLoadManager {
 
     private final Set<String> loadedSplitApkPaths = new ArraySet<>();
 
-    SplitLoadManager(Context context) {
+    private final String[] processes;
+
+    SplitLoadManager(Context context, String[] processes) {
         this.context = context;
         this.currentProcessName = ProcessUtil.getProcessName(context);
+        this.processes = processes;
     }
 
     /**
-     * Load all installed splits.
+     * Hook PathClassloader if need
      */
-    public abstract void load(String[] processes, boolean needHookClassLoader);
+    public abstract void injectPathClassloaderIfNeed(boolean needHookClassLoader);
+
+    /**
+     * Called this method in {@link Application#onCreate()}.
+     */
+    public abstract void onCreate();
 
     /**
      * Called this method in {@link Application#getResources()}.
@@ -81,7 +89,7 @@ public abstract class SplitLoadManager {
      * @param loadListener     a callback to be invoked when splits loaded.
      * @return load splits runnable.
      */
-    public abstract Runnable createSplitLoadTask(List<Intent> splitFileIntents, @Nullable OnSplitLoadListener loadListener, boolean needActivate);
+    public abstract Runnable createSplitLoadTask(List<Intent> splitFileIntents, @Nullable OnSplitLoadListener loadListener);
 
     /**
      * Get names of loaded splits
@@ -101,12 +109,20 @@ public abstract class SplitLoadManager {
         return loadedSplitApkPaths;
     }
 
-    public abstract void loadInstalledSplits(boolean processStarting);
+    public abstract void loadInstalledSplits();
 
     abstract PathClassLoader getInjectedClassloader();
 
     String getCurrentProcessName() {
         return currentProcessName;
+    }
+
+    boolean hasWorkProcess() {
+        return processes != null && processes.length > 0;
+    }
+
+    String[] getWorkProcesses() {
+        return processes;
     }
 
     Context getContext() {

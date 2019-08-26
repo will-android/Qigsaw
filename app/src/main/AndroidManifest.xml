@@ -15,7 +15,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:ignore="GoogleAppIndexingWarning"
-        tools:replace="android:name"
+        tools:replace="android:name,android:appComponentFactory"
         tools:targetApi="p">
         <activity android:name=".MainActivity">
             <intent-filter>
@@ -27,6 +27,12 @@
 
         <activity
             android:name=".QigsawInstaller"
+            android:theme="@style/Theme.ActivityDialogStyle" />
+
+        <activity
+            android:name=".SampleObtainUserConfirmationDialog"
+            android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.ActivityDialogStyle" />
 
     </application>

@@ -24,6 +24,8 @@
 
 package com.iqiyi.android.qigsaw.core;
 
+import android.app.Application;
+
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallReporter;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitLoadReporter;
@@ -62,6 +64,17 @@ public class SplitConfiguration {
      */
     private final SplitLog.Logger logger;
 
+    /**
+     * Customized dialog for requiring user confirmation whether allowed to download splits while using mobile data
+     */
+    private final Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass;
+
+    /**
+     * Load all installed splits during {@link Application#onCreate()},
+     * if {@code true}, this operation maybe affect launch performance of process.
+     */
+    private boolean loadInstalledSplitsOnApplicationCreate;
+
     public static SplitConfiguration.Builder newBuilder() {
         return new SplitConfiguration.Builder();
     }
@@ -73,6 +86,8 @@ public class SplitConfiguration {
         this.loadReporter = builder.loadReporter;
         this.updateReporter = builder.updateReporter;
         this.logger = builder.logger;
+        this.obtainUserConfirmationDialogClass = builder.obtainUserConfirmationDialogClass;
+        this.loadInstalledSplitsOnApplicationCreate = builder.loadInstalledSplitsOnApplicationCreate;
 
     }
 
@@ -100,6 +115,14 @@ public class SplitConfiguration {
         return logger;
     }
 
+    Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass() {
+        return obtainUserConfirmationDialogClass;
+    }
+
+    boolean loadInstalledSplitsOnApplicationCreate() {
+        return loadInstalledSplitsOnApplicationCreate;
+    }
+
     public static class Builder {
 
         private String[] workProcesses;
@@ -113,6 +136,10 @@ public class SplitConfiguration {
         private SplitUpdateReporter updateReporter;
 
         private SplitLog.Logger logger;
+
+        private boolean loadInstalledSplitsOnApplicationCreate;
+
+        private Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass;
 
         private Builder() {
 
@@ -145,6 +172,16 @@ public class SplitConfiguration {
 
         public Builder updateReporter(SplitUpdateReporter updateReporter) {
             this.updateReporter = updateReporter;
+            return this;
+        }
+
+        public Builder obtainUserConfirmationDialogClass(Class<? extends ObtainUserConfirmationDialog> clazz) {
+            this.obtainUserConfirmationDialogClass = clazz;
+            return this;
+        }
+
+        public Builder loadInstalledSplitsOnApplicationCreate(boolean value) {
+            this.loadInstalledSplitsOnApplicationCreate = value;
             return this;
         }
 
