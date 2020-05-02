@@ -26,17 +26,22 @@ package com.iqiyi.android.qigsaw.core.extension.fakecomponents;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public class FakeActivity extends Activity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        int orientation = OrientationCompat.releaseFixedOrientation(this);
         super.onCreate(savedInstanceState);
+        OrientationCompat.fixedOrientation(this, orientation);
+        if (getIntent() != null) {
+            setIntent(null);
+        }
         finish();
     }
 }

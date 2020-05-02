@@ -2,7 +2,7 @@ package com.iqiyi.android.qigsaw.core.common;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 import android.text.TextUtils;
 
 import java.io.BufferedReader;
@@ -10,7 +10,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.List;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public class ProcessUtil {
@@ -33,10 +33,6 @@ public class ProcessUtil {
                 android.os.Process.killProcess(ai.pid);
             }
         }
-    }
-
-    public static boolean isMainProcess(Context context) {
-        return context.getPackageName().equals(getProcessName(context));
     }
 
     public static String getProcessName(Context context) {

@@ -26,11 +26,10 @@ package com.iqiyi.android.qigsaw.core.extension;
 
 import android.app.Application;
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.RestrictTo;
-import android.text.TextUtils;
-import android.util.Pair;
+import androidx.annotation.NonNull;
+import androidx.annotation.RestrictTo;
 
+import com.iqiyi.android.qigsaw.core.common.SplitAABInfoProvider;
 import com.iqiyi.android.qigsaw.core.common.SplitBaseInfoProvider;
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import com.iqiyi.android.qigsaw.core.extension.fakecomponents.FakeActivity;
@@ -46,7 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 /**
  * Extension of Android App Bundles function.
@@ -61,67 +60,64 @@ public class AABExtension {
 
     private static final AtomicReference<AABExtension> sAABCompatReference = new AtomicReference<>(null);
 
-    private final List<Application> splitApplications = new ArrayList<>();
-
     private final Map<String, List<ContentProviderProxy>> sSplitContentProviderMap = new HashMap<>();
 
     private final AABExtensionManager extensionManager;
 
-    private AABExtension(Context context) {
-        Set<String> splitNames = getSplitNames();
-        this.extensionManager = new AABExtensionManagerImpl(context, new SplitComponentInfoProvider(splitNames));
-    }
+    private final List<Application> aabApplications = new ArrayList<>();
 
-    public static void install(Context context) {
-        sAABCompatReference.compareAndSet(null, new AABExtension(context));
+    private AABExtension() {
+        Set<String> splitNames = getSplitNames();
+        this.extensionManager = new AABExtensionManagerImpl(new SplitComponentInfoProvider(splitNames));
     }
 
     public static AABExtension getInstance() {
         if (sAABCompatReference.get() == null) {
-            throw new RuntimeException("Have you invoke AABCompat#install(Context) method?");
+            sAABCompatReference.set(new AABExtension());
         }
         return sAABCompatReference.get();
     }
 
-    /**
-     * Called when base app {@link Application#attachBaseContext(Context)} is invoked.
-     *
-     * @param aabLoadedSplits list of loaded split name for AAB.
-     */
-    public void onBaseContextAttached(@NonNull Set<String> aabLoadedSplits) {
-        //remove unload split providers
+    public void createAndActiveSplitApplication(Context appContext, boolean qigsawMode) {
+        if (qigsawMode) {
+            return;
+        }
+        final Set<String> aabLoadedSplits = new SplitAABInfoProvider(appContext).getInstalledSplitsForAAB();
         if (!aabLoadedSplits.isEmpty()) {
             for (String splitName : aabLoadedSplits) {
                 try {
-                    Application app = createApplication(splitName);
+                    Application app = createApplication(AABExtension.class.getClassLoader(), splitName);
                     if (app != null) {
-                        splitApplications.add(app);
+                        activeApplication(app, appContext);
+                        aabApplications.add(app);
                     }
-                } catch (Exception e) {
+                } catch (AABExtensionException e) {
                     SplitLog.w(TAG, "Failed to create " + splitName + " application", e);
                 }
             }
         }
     }
 
-    /**
-     * Called when base app {@link Application#onCreate()} method is invoked!
-     */
-    public void onCreate() {
-        for (Application application : splitApplications) {
-            application.onCreate();
+    public void onApplicationCreate() {
+        if (!aabApplications.isEmpty()) {
+            for (Application application : aabApplications) {
+                application.onCreate();
+            }
         }
     }
 
     /**
      * Create and active split application.
      *
-     * @param splitName name of split.
+     * @param classLoader used to load class.
+     * @param splitName   name of split.
      */
-    public Application createApplication(String splitName) throws AABExtensionException {
-        Application app = extensionManager.createApplication(splitName);
-        extensionManager.activeApplication(app);
-        return app;
+    public Application createApplication(ClassLoader classLoader, String splitName) throws AABExtensionException {
+        return extensionManager.createApplication(classLoader, splitName);
+    }
+
+    public void activeApplication(Application splitApplication, Context appContext) throws AABExtensionException {
+        extensionManager.activeApplication(splitApplication, appContext);
     }
 
     void put(String splitName, ContentProviderProxy providerProxy) {
@@ -133,29 +129,40 @@ public class AABExtension {
         providerProxies.add(providerProxy);
     }
 
-    public void activateSplitProviders(String splitName) throws AABExtensionException {
+    public void activateSplitProviders(ClassLoader classLoader, String splitName) throws AABExtensionException {
         List<ContentProviderProxy> providerProxies = sSplitContentProviderMap.get(splitName);
         if (providerProxies != null) {
             for (ContentProviderProxy providerProxy : providerProxies) {
-                providerProxy.activateRealContentProvider();
+                providerProxy.activateRealContentProvider(classLoader);
             }
         }
     }
 
-    public Pair<String, Class<?>> getSplitNameForComponent(String name) {
-        String targetSplitName = extensionManager.getSplitNameForActivity(name);
-        if (!TextUtils.isEmpty(targetSplitName)) {
-            return new Pair<String, Class<?>>(targetSplitName, FakeActivity.class);
+    public Class<?> getFakeComponent(String className) {
+        if (extensionManager.isSplitActivity(className)) {
+            return FakeActivity.class;
         }
-        targetSplitName = extensionManager.getSplitNameForService(name);
-        if (!TextUtils.isEmpty(targetSplitName)) {
-            return new Pair<String, Class<?>>(targetSplitName, FakeService.class);
+        if (extensionManager.isSplitService(className)) {
+            return FakeService.class;
         }
-        targetSplitName = extensionManager.getSplitNameForReceiver(name);
-        if (!TextUtils.isEmpty(targetSplitName)) {
-            return new Pair<String, Class<?>>(targetSplitName, FakeReceiver.class);
+        if (extensionManager.isSplitReceiver(className)) {
+            return FakeReceiver.class;
         }
         return null;
+    }
+
+    public String getSplitNameForActivityName(@NonNull String activityClassName) {
+        String ret = null;
+        Map<String, List<String>> splitActivitiesMap = extensionManager.getSplitActivitiesMap();
+        for (Map.Entry<String, List<String>> entry : splitActivitiesMap.entrySet()) {
+            String splitName = entry.getKey();
+            List<String> activities = entry.getValue();
+            if (activities != null && activities.contains(activityClassName)) {
+                ret = splitName;
+                break;
+            }
+        }
+        return ret;
     }
 
     private Set<String> getSplitNames() {

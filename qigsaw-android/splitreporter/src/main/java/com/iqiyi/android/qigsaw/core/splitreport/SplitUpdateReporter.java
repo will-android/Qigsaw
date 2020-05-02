@@ -24,6 +24,9 @@
 
 package com.iqiyi.android.qigsaw.core.splitreport;
 
+import androidx.annotation.MainThread;
+import androidx.annotation.WorkerThread;
+
 import java.util.List;
 
 /**
@@ -35,24 +38,29 @@ public interface SplitUpdateReporter {
      * When split-info version is updated, this method would be invoked.
      * You can kill main process in this method.
      *
+     * @param oldSplitInfoVersion last version of split info file.
      * @param newSplitInfoVersion new version of split info file.
      * @param updateSplits        splits need be updated
      */
-    void onUpdateOK(String newSplitInfoVersion, List<String> updateSplits);
+    @WorkerThread
+    void onUpdateOK(String oldSplitInfoVersion, String newSplitInfoVersion, List<String> updateSplits);
 
     /**
      * Called when updating failed
      *
+     * @param oldSplitInfoVersion last version of split info file.
      * @param newSplitInfoVersion new version of split info file.
      * @param errorCode           {@link SplitUpdateErrorCode}
      */
-    void onUpdateFailed(String newSplitInfoVersion, int errorCode);
+    @WorkerThread
+    void onUpdateFailed(String oldSplitInfoVersion, String newSplitInfoVersion, int errorCode);
 
     /**
      * Called when new split info version loaded.
      *
      * @param newSplitInfoVersion new version of split info file.
      */
+    @MainThread
     void onNewSplitInfoVersionLoaded(String newSplitInfoVersion);
 
 }

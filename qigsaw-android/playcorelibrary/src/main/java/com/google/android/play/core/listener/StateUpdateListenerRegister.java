@@ -3,7 +3,7 @@ package com.google.android.play.core.listener;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 
 import com.google.android.play.core.splitcompat.util.PlayCore;
 
@@ -12,7 +12,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public abstract class StateUpdateListenerRegister<StateT> {
@@ -27,25 +27,39 @@ public abstract class StateUpdateListenerRegister<StateT> {
 
     private final StateUpdatedReceiver receiver = new StateUpdatedReceiver(this);
 
+    private final Object mLock = new Object();
+
     protected StateUpdateListenerRegister(PlayCore playCore, IntentFilter intentFilter, Context context) {
         this.playCore = playCore;
         this.intentFilter = intentFilter;
         this.context = context;
     }
 
-    public final synchronized void registerListener(StateUpdatedListener<StateT> listener) {
-        this.playCore.debug("registerListener");
-        mStateUpdatedListeners.add(listener);
-        if (mStateUpdatedListeners.size() == 1) {
-            context.registerReceiver(receiver, intentFilter);
+    public final void registerListener(StateUpdatedListener<StateT> listener) {
+        synchronized (mLock) {
+            this.playCore.debug("registerListener");
+            if (mStateUpdatedListeners.contains(listener)) {
+                this.playCore.debug("listener has been registered!");
+                return;
+            }
+            mStateUpdatedListeners.add(listener);
+            if (mStateUpdatedListeners.size() == 1) {
+                context.registerReceiver(receiver, intentFilter);
+            }
         }
     }
 
-    public final synchronized void unregisterListener(StateUpdatedListener<StateT> listener) {
-        this.playCore.debug("unregisterListener");
-        mStateUpdatedListeners.remove(listener);
-        if (mStateUpdatedListeners.isEmpty()) {
-            context.unregisterReceiver(receiver);
+    public final void unregisterListener(StateUpdatedListener<StateT> listener) {
+        synchronized (mLock) {
+            this.playCore.debug("unregisterListener");
+            boolean contained = mStateUpdatedListeners.remove(listener);
+            if (mStateUpdatedListeners.isEmpty() && contained) {
+                try {
+                    context.unregisterReceiver(receiver);
+                } catch (IllegalArgumentException e) {
+                    playCore.error(e, "Receiver not registered: " + intentFilter.getAction(0));
+                }
+            }
         }
     }
 

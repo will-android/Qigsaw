@@ -39,10 +39,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.annotation.RestrictTo;
 
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
 
@@ -68,10 +68,10 @@ public abstract class ContentProviderProxy extends ContentProvider {
         return realContentProvider;
     }
 
-    void activateRealContentProvider() throws AABExtensionException {
+    void activateRealContentProvider(ClassLoader classLoader) throws AABExtensionException {
         Throwable error = null;
         try {
-            realContentProvider = createRealContentProvider();
+            realContentProvider = createRealContentProvider(classLoader);
         } catch (ClassNotFoundException e) {
             error = e;
         } catch (IllegalAccessException e) {
@@ -84,8 +84,12 @@ public abstract class ContentProviderProxy extends ContentProvider {
         }
     }
 
-    private ContentProvider createRealContentProvider() throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        ContentProvider realContentProvider = (ContentProvider) Class.forName(realContentProviderClassName).newInstance();
+    private ContentProvider createRealContentProvider(ClassLoader classLoader) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+        if (getContext() == null || realContentProviderClassName == null) {
+            SplitLog.w(TAG, "Cause of null context, we can't create real provider " + realContentProviderClassName);
+            return null;
+        }
+        ContentProvider realContentProvider = (ContentProvider) classLoader.loadClass(realContentProviderClassName).newInstance();
         realContentProvider.attachInfo(getContext(), providerInfo);
         SplitLog.d(TAG, "Success to create provider " + realContentProviderClassName);
         return realContentProvider;
@@ -100,11 +104,11 @@ public abstract class ContentProviderProxy extends ContentProvider {
 
     @Override
     public void attachInfo(Context context, ProviderInfo info) {
-        super.attachInfo(context, info);
         String className = getClass().getName();
         String[] cuts = className.split(NAME_INFIX);
         this.realContentProviderClassName = cuts[0];
         this.splitName = cuts[1];
+        super.attachInfo(context, info);
         this.providerInfo = new ProviderInfo(info);
         AABExtension.getInstance().put(splitName, this);
     }
@@ -290,7 +294,7 @@ public abstract class ContentProviderProxy extends ContentProvider {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        if (checkRealContentProviderInstallStatus(splitName)) {
+        if (realContentProvider != null) {
             realContentProvider.onTrimMemory(level);
         }
     }
@@ -298,7 +302,7 @@ public abstract class ContentProviderProxy extends ContentProvider {
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        if (checkRealContentProviderInstallStatus(splitName)) {
+        if (realContentProvider != null) {
             realContentProvider.onLowMemory();
         }
     }

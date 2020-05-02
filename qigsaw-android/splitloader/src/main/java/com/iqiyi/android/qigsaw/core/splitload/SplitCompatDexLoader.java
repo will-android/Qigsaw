@@ -37,7 +37,6 @@ final class SplitCompatDexLoader {
         }
     }
 
-
     static void unLoad(ClassLoader classLoader) throws Throwable {
         if (sPatchDexCount <= 0) {
             return;

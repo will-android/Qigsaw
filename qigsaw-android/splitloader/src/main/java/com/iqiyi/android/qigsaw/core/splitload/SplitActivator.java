@@ -25,34 +25,71 @@
 package com.iqiyi.android.qigsaw.core.splitload;
 
 import android.app.Application;
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
 
 import com.iqiyi.android.qigsaw.core.extension.AABExtension;
 import com.iqiyi.android.qigsaw.core.extension.AABExtensionException;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitLoadError;
 
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
+
 final class SplitActivator {
 
     private final AABExtension aabExtension;
 
-    SplitActivator(AABExtension aabExtension) {
-        this.aabExtension = aabExtension;
+    private final Context appContext;
+
+    private static final Map<String, Application> sSplitApplicationMap = new HashMap<>();
+
+    SplitActivator(Context context) {
+        this.appContext = context;
+        this.aabExtension = AABExtension.getInstance();
     }
 
-    void activate(String splitName) throws SplitLoadException {
+    void activate(ClassLoader classLoader, String splitName) throws SplitLoadException {
         Application app;
         try {
-            app = aabExtension.createApplication(splitName);
-        } catch (AABExtensionException e) {
+            app = aabExtension.createApplication(classLoader, splitName);
+            if (app != null) {
+                sSplitApplicationMap.put(splitName, app);
+            }
+            aabExtension.activeApplication(app, appContext);
+        } catch (Throwable e) {
+            if (debuggable()) {
+                if (!(e instanceof AABExtensionException)) {
+                    throw new RuntimeException(e);
+                }
+            }
             throw new SplitLoadException(SplitLoadError.ACTIVATE_APPLICATION_FAILED, e);
         }
-
         try {
-            aabExtension.activateSplitProviders(splitName);
+            aabExtension.activateSplitProviders(classLoader, splitName);
         } catch (AABExtensionException e) {
             throw new SplitLoadException(SplitLoadError.ACTIVATE_PROVIDERS_FAILED, e);
         }
         if (app != null) {
-            app.onCreate();
+            try {
+                Method method = HiddenApiReflection.findMethod(Application.class, "onCreate");
+                method.invoke(app);
+            } catch (Throwable e) {
+                if (debuggable()) {
+                    throw new RuntimeException(e);
+                }
+                throw new SplitLoadException(SplitLoadError.ACTIVATE_APPLICATION_FAILED, e);
+            }
         }
+    }
+
+    private boolean debuggable() {
+        try {
+            ApplicationInfo info = appContext.getApplicationInfo();
+            return (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        } catch (Throwable ignored) {
+
+        }
+        return false;
     }
 }

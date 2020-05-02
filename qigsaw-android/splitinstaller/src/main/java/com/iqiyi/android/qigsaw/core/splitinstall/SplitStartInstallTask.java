@@ -30,7 +30,6 @@ import com.iqiyi.android.qigsaw.core.common.SplitConstants;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallError;
 import com.iqiyi.android.qigsaw.core.splitrequest.splitinfo.SplitInfo;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,16 +42,15 @@ final class SplitStartInstallTask extends SplitInstallTask {
     SplitStartInstallTask(int sessionId,
                           SplitInstaller installer,
                           SplitInstallSessionManager sessionManager,
-                          List<String> moduleNames,
                           List<SplitInfo> splitInfoList) {
-        super(installer, moduleNames, splitInfoList);
+        super(installer, splitInfoList);
         this.mSessionState = sessionManager.getSessionState(sessionId);
         this.mSessionManager = sessionManager;
     }
 
     @Override
-    boolean continueInstallIgnoreError() {
-        return false;
+    boolean isStartInstallOperation() {
+        return true;
     }
 
     @Override
@@ -63,31 +61,14 @@ final class SplitStartInstallTask extends SplitInstallTask {
     }
 
     @Override
-    protected void onInstallCompleted(List<SplitInstaller.InstallResult> installResults, long cost) {
-        List<SplitInstallError> installErrors = new ArrayList<>(0);
-        for (SplitInstaller.InstallResult installResult : installResults) {
-            if (!installResult.dependenciesInstalled) {
-                Throwable exception = new Exception("Split " + installResult.splitName + "' dependencies are not installed!");
-                installErrors.add(new SplitInstallError(installResult.splitName, SplitInstallError.DEPENDENCIES_NOT_INSTALLED, exception));
-            }
-        }
-        if (!installErrors.isEmpty()) {
-            onInstallFailed(installErrors, cost);
-            return;
-        }
+    void onInstallCompleted(List<SplitInstaller.InstallResult> installResults) {
+        super.onInstallCompleted(installResults);
         List<Intent> splitFileIntents = new ArrayList<>(installResults.size());
         for (SplitInstaller.InstallResult installResult : installResults) {
             Intent splitFileIntent = new Intent();
-            if (installResult.libFile != null) {
-                splitFileIntent.putExtra(SplitConstants.KEY_NATIVE_LIBRARIES, installResult.libFile.getAbsolutePath());
+            if (installResult.addedDexPaths != null) {
+                splitFileIntent.putStringArrayListExtra(SplitConstants.KEY_ADDED_DEX, (ArrayList<String>) installResult.addedDexPaths);
             }
-            if (installResult.multiDexFiles != null) {
-                splitFileIntent.putStringArrayListExtra(SplitConstants.KEY_MULTI_DEX, getDexFilePaths(installResult.multiDexFiles));
-            }
-            if (installResult.optDir != null) {
-                splitFileIntent.putExtra(SplitConstants.KEY_OPTIMIZED_DIRECTORY, installResult.optDir.getAbsolutePath());
-            }
-            splitFileIntent.putExtra(SplitConstants.KET_SPLIT_DIR, installResult.splitDir.getAbsolutePath());
             splitFileIntent.putExtra(SplitConstants.KEY_APK, installResult.apkFile.getAbsolutePath());
             splitFileIntent.putExtra(SplitConstants.KET_NAME, installResult.splitName);
             splitFileIntents.add(splitFileIntent);
@@ -95,30 +76,19 @@ final class SplitStartInstallTask extends SplitInstallTask {
         mSessionState.setSplitFileIntents(splitFileIntents);
         mSessionManager.changeSessionState(mSessionState.sessionId(), SplitInstallInternalSessionStatus.POST_INSTALLED);
         emitSessionStatus();
-        if (SplitInstallReporterManager.getInstallReporter() != null) {
-            SplitInstallReporterManager.getInstallReporter().onStartInstallOK(moduleNames, cost);
-        }
+
     }
 
     @Override
-    protected void onInstallFailed(List<SplitInstallError> errors, long cost) {
-        mSessionState.setErrorCode(errors.get(0).getErrorCode());
+    void onInstallFailed(List<SplitInstallError> errors) {
+        super.onInstallFailed(errors);
+        mSessionState.setErrorCode(errors.get(0).errorCode);
         mSessionManager.changeSessionState(mSessionState.sessionId(), SplitInstallInternalSessionStatus.FAILED);
         emitSessionStatus();
-        if (SplitInstallReporterManager.getInstallReporter() != null) {
-            SplitInstallReporterManager.getInstallReporter().onStartInstallFailed(moduleNames, errors.get(0), cost);
-        }
     }
 
     private void emitSessionStatus() {
         mSessionManager.emitSessionState(mSessionState);
     }
 
-    private ArrayList<String> getDexFilePaths(List<File> dexFiles) {
-        ArrayList<String> dexFilePaths = new ArrayList<>(dexFiles.size());
-        for (File dexFile : dexFiles) {
-            dexFilePaths.add(dexFile.getAbsolutePath());
-        }
-        return dexFilePaths;
-    }
 }

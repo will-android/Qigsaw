@@ -24,8 +24,14 @@
 
 package com.iqiyi.qigsaw.buildtool.gradle.task
 
-import com.iqiyi.qigsaw.buildtool.gradle.QigsawAppBasePlugin
+import com.android.annotations.Nullable
+import com.iqiyi.qigsaw.buildtool.gradle.extension.QigsawSplitExtensionHelper
+import com.iqiyi.qigsaw.buildtool.gradle.internal.tool.QigsawLogger
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 
 class QigsawProguardConfigTask extends DefaultTask {
@@ -56,45 +62,53 @@ class QigsawProguardConfigTask extends DefaultTask {
             "-keep class com.iqiyi.android.qigsaw.core.splitdownload.Downloader{\n *;\n }\n" +
             "-keep class * implements com.iqiyi.android.qigsaw.core.splitdownload.Downloader{\n *;\n }\n" +
             "-keep class com.iqiyi.android.qigsaw.core.Qigsaw{\n public <methods>;\n }\n" +
-            "-keep class com.iqiyi.android.qigsaw.core.extension.ComponentInfo{\n *;\n }\n"
+            "-keep class com.iqiyi.android.qigsaw.core.extension.ComponentInfo{\n *;\n }\n" +
+            "-keep class com.iqiyi.android.qigsaw.core.splitlib.**{\n *;\n }\n"
 
-    def applicationVariant
+    @OutputDirectory
+    File outputDir
 
-    String packageName
+    @InputFile
+    @Optional
+    @Nullable
+    File applyMappingFile
 
-    QigsawProguardConfigTask() {
+    @Input
+    String applicationId
 
+    void initArgs(String applicationId) {
+        this.applicationId = applicationId
+        String applyMappingPath = QigsawSplitExtensionHelper.getApplyMapping(project)
+        this.applyMappingFile = (applyMappingPath == null ? null : new File(applyMappingPath))
+    }
+
+    File getOutputProguardFile() {
+        return new File(outputDir, PROGUARD_CONFIG_NAME)
     }
 
     @TaskAction
     void updateQigsawProguardConfig() {
-        String proguardFilePath = QigsawAppBasePlugin.QIGSAW_INTERMEDIATES + "mapping" + File.separator + applicationVariant.name
-        project.mkdir(proguardFilePath)
-        def file = project.file(proguardFilePath + File.separator + PROGUARD_CONFIG_NAME)
-        project.logger.debug("try update qigsaw proguard file with ${file}")
-
-        // Create the directory if it doesnt exist already
-        file.getParentFile().mkdirs()
-
+        if (outputDir.exists()) {
+            outputDir.deleteDir()
+        }
+        outputDir.mkdirs()
+        File file = new File(outputDir, PROGUARD_CONFIG_NAME)
+        QigsawLogger.w("try update qigsaw proguard file with ${file}")
         // Write our recommended proguard settings to this file
         FileWriter fw = new FileWriter(file.path)
-        String applyMappingPath = project.extensions.qigsawSplit.applyMapping
-        if (applyMappingPath != null) {
-            File mappingFile = new File(applyMappingPath)
-            if (mappingFile.exists() && mappingFile.isFile() && mappingFile.length() > 0) {
-                project.logger.debug("try add applymapping ${mappingFile.path} to build the package")
-                fw.write("-applymapping " + applyMappingPath)
+        if (applyMappingFile != null) {
+            if (applyMappingFile.exists() && applyMappingFile.isFile() && applyMappingFile.length() > 0) {
+                QigsawLogger.w("try to add applymapping ${applyMappingFile.path} to build the package")
+                fw.write("-applymapping " + applyMappingFile.absolutePath)
                 fw.write("\n")
             } else {
-                project.logger.error("applymapping file ${applyMappingPath} is not valid, just ignore!")
+                QigsawLogger.e("applymapping file ${applyMappingFile.absolutePath} is not valid, just ignore!")
             }
         } else {
-            project.logger.error("applymapping file ${applyMappingPath} is not null, just ignore!")
+            QigsawLogger.e("applymapping file is null, just ignore!")
         }
-        fw.write(PROGUARD_CONFIG_SETTINGS + "-keep class ${packageName}.BuildConfig{\n *;\n }\n")
+        fw.write(PROGUARD_CONFIG_SETTINGS + "-keep class ${applicationId}.QigsawConfig{\n *;\n }\n")
         fw.close()
-        applicationVariant.getBuildType().buildType.proguardFiles(file)
-        def files = applicationVariant.buildType.proguardFiles
-        project.logger.info("now proguard files are ${files}")
     }
 }
+

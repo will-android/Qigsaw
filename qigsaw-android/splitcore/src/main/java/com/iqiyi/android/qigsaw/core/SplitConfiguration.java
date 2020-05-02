@@ -24,110 +24,61 @@
 
 package com.iqiyi.android.qigsaw.core;
 
-import android.app.Application;
+import androidx.annotation.NonNull;
 
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
+import com.iqiyi.android.qigsaw.core.splitload.SplitLoad;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallReporter;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitLoadReporter;
+import com.iqiyi.android.qigsaw.core.splitreport.SplitUninstallReporter;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitUpdateReporter;
 
 public class SplitConfiguration {
 
-    /**
-     * processes that load all installed splits during application launch time, if null all processes would load.
-     */
-    private final String[] workProcesses;
+    final int splitLoadMode;
 
-    /**
-     * if the package name you declared in app manifest does not match applicationId in app/build.gradle,
-     * you have to set it.
-     */
-    private final String manifestPackageName;
+    final String[] workProcesses;
 
-    /**
-     * Report installing status when splits are fully installed.
-     */
-    private final SplitInstallReporter installReporter;
+    final String[] forbiddenWorkProcesses;
 
-    /**
-     * Report loading status when splits are fully loaded.
-     */
-    private final SplitLoadReporter loadReporter;
+    final SplitInstallReporter installReporter;
 
-    /**
-     * Report updating status when split info version is fully updated.
-     */
-    private final SplitUpdateReporter updateReporter;
+    final SplitLoadReporter loadReporter;
 
-    /**
-     * Customized logger for {@link SplitLog}
-     */
-    private final SplitLog.Logger logger;
+    final SplitUpdateReporter updateReporter;
 
-    /**
-     * Customized dialog for requiring user confirmation whether allowed to download splits while using mobile data
-     */
-    private final Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass;
+    final SplitUninstallReporter uninstallReporter;
 
-    /**
-     * Load all installed splits during {@link Application#onCreate()},
-     * if {@code true}, this operation maybe affect launch performance of process.
-     */
-    private boolean loadInstalledSplitsOnApplicationCreate;
+    final Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass;
+
+    final boolean verifySignature;
 
     public static SplitConfiguration.Builder newBuilder() {
         return new SplitConfiguration.Builder();
     }
 
     private SplitConfiguration(Builder builder) {
-        this.workProcesses = builder.workProcesses;
-        this.manifestPackageName = builder.manifestPackageName;
+        if (builder.forbiddenWorkProcesses != null && builder.workProcesses != null) {
+            throw new RuntimeException("forbiddenWorkProcesses and workProcesses can't be set at the same time, you should choose one of them.");
+        }
+        this.splitLoadMode = builder.splitLoadMode;
+        this.forbiddenWorkProcesses = builder.forbiddenWorkProcesses;
         this.installReporter = builder.installReporter;
         this.loadReporter = builder.loadReporter;
         this.updateReporter = builder.updateReporter;
-        this.logger = builder.logger;
+        this.uninstallReporter = builder.uninstallReporter;
         this.obtainUserConfirmationDialogClass = builder.obtainUserConfirmationDialogClass;
-        this.loadInstalledSplitsOnApplicationCreate = builder.loadInstalledSplitsOnApplicationCreate;
-
-    }
-
-    String[] getWorkProcesses() {
-        return workProcesses;
-    }
-
-    String getManifestPackageName() {
-        return manifestPackageName;
-    }
-
-    SplitInstallReporter getInstallReporter() {
-        return installReporter;
-    }
-
-    SplitLoadReporter getLoadReporter() {
-        return loadReporter;
-    }
-
-    SplitUpdateReporter getUpdateReporter() {
-        return updateReporter;
-    }
-
-    SplitLog.Logger getLogger() {
-        return logger;
-    }
-
-    Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass() {
-        return obtainUserConfirmationDialogClass;
-    }
-
-    boolean loadInstalledSplitsOnApplicationCreate() {
-        return loadInstalledSplitsOnApplicationCreate;
+        this.workProcesses = builder.workProcesses;
+        this.verifySignature = builder.verifySignature;
     }
 
     public static class Builder {
 
+        private int splitLoadMode = SplitLoad.MULTIPLE_CLASSLOADER;
+
         private String[] workProcesses;
 
-        private String manifestPackageName;
+        private String[] forbiddenWorkProcesses;
 
         private SplitInstallReporter installReporter;
 
@@ -135,53 +86,100 @@ public class SplitConfiguration {
 
         private SplitUpdateReporter updateReporter;
 
-        private SplitLog.Logger logger;
-
-        private boolean loadInstalledSplitsOnApplicationCreate;
+        private SplitUninstallReporter uninstallReporter;
 
         private Class<? extends ObtainUserConfirmationDialog> obtainUserConfirmationDialogClass;
 
+        private boolean verifySignature = true;
+
         private Builder() {
-
+            this.obtainUserConfirmationDialogClass = DefaultObtainUserConfirmationDialog.class;
         }
 
-        public Builder logger(SplitLog.Logger logger) {
-            this.logger = logger;
+        /**
+         * Customized logger for {@link SplitLog}
+         */
+        public Builder logger(@NonNull SplitLog.Logger logger) {
+            SplitLog.setSplitLogImp(logger);
             return this;
         }
 
-        public Builder workProcesses(String[] workProcesses) {
-            this.workProcesses = workProcesses;
+        /**
+         * You can decide to use single or multiple class loader mode to load splits, see {@link SplitLoad} to know more details.
+         */
+        public Builder splitLoadMode(@SplitLoad.SplitLoadMode int splitLoadMode) {
+            this.splitLoadMode = splitLoadMode;
             return this;
         }
 
-        public Builder manifestPackageName(String manifestPackageName) {
-            this.manifestPackageName = manifestPackageName;
+        /**
+         * Processes(main process always work) which are permitted to load all installed splits during application launch time.
+         * This is method can't be invoked with {@link Builder#forbiddenWorkProcesses(String[])} together.
+         */
+        public Builder workProcesses(@NonNull String[] workProcesses) {
+            if (workProcesses.length > 0) {
+                this.workProcesses = workProcesses;
+            }
             return this;
         }
 
-        public Builder installReporter(SplitInstallReporter installReporter) {
+        /**
+         * Processes which are forbidden to load all installed splits during application launch time.
+         * This is method can't be invoked with {@link Builder#workProcesses(String[])} together.
+         */
+        public Builder forbiddenWorkProcesses(@NonNull String[] forbiddenWorkProcesses) {
+            if (forbiddenWorkProcesses.length > 0) {
+                this.forbiddenWorkProcesses = forbiddenWorkProcesses;
+            }
+            return this;
+        }
+
+        /**
+         * Report installing status when splits are fully installed.
+         */
+        public Builder installReporter(@NonNull SplitInstallReporter installReporter) {
             this.installReporter = installReporter;
             return this;
         }
 
-        public Builder loadReporter(SplitLoadReporter loadReporter) {
+        /**
+         * Report loading status when splits are fully loaded.
+         */
+        public Builder loadReporter(@NonNull SplitLoadReporter loadReporter) {
             this.loadReporter = loadReporter;
             return this;
         }
 
-        public Builder updateReporter(SplitUpdateReporter updateReporter) {
+        /**
+         * Report uninstall status when splits are fully uninstalled.
+         */
+        public Builder uninstallReporter(@NonNull SplitUninstallReporter uninstallReporter) {
+            this.uninstallReporter = uninstallReporter;
+            return this;
+        }
+
+        /**
+         * Report updating status when split info version is fully updated.
+         */
+        public Builder updateReporter(@NonNull SplitUpdateReporter updateReporter) {
             this.updateReporter = updateReporter;
             return this;
         }
 
-        public Builder obtainUserConfirmationDialogClass(Class<? extends ObtainUserConfirmationDialog> clazz) {
+        /**
+         * Customized dialog for requiring user confirmation whether allowed to download splits while using mobile data
+         */
+        public Builder obtainUserConfirmationDialogClass(@NonNull Class<? extends ObtainUserConfirmationDialog> clazz) {
             this.obtainUserConfirmationDialogClass = clazz;
             return this;
         }
 
-        public Builder loadInstalledSplitsOnApplicationCreate(boolean value) {
-            this.loadInstalledSplitsOnApplicationCreate = value;
+        /**
+         * Whether need to verify signature of split apk. if {@code true} split apk is verified to match the base apk,
+         * otherwise ignore signature verification for split apks.
+         */
+        public Builder verifySignature(boolean verifySignature) {
+            this.verifySignature = verifySignature;
             return this;
         }
 

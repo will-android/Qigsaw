@@ -27,13 +27,17 @@ package com.iqiyi.android.qigsaw.core;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 import java.text.DecimalFormat;
 
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+
+@RestrictTo(LIBRARY_GROUP)
 public class DefaultObtainUserConfirmationDialog extends ObtainUserConfirmationDialog {
 
     private boolean fromUserClick;

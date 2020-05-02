@@ -25,14 +25,14 @@
 package com.iqiyi.android.qigsaw.core.splitrequest.splitinfo;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.NonNull;
+import androidx.annotation.RestrictTo;
 
 import java.io.File;
 import java.util.Collection;
 import java.util.List;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public interface SplitInfoManager {
@@ -60,6 +60,15 @@ public interface SplitInfoManager {
      * @return {@link SplitInfo}
      */
     SplitInfo getSplitInfo(Context context, String splitName);
+
+    /**
+     * get a list of {@link SplitInfo}
+     *
+     * @param context
+     * @param splitNames a list of split name.
+     * @return a list of {@link SplitInfo}
+     */
+    List<SplitInfo> getSplitInfos(Context context, Collection<String> splitNames);
 
     /**
      * @param context get all split info

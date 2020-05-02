@@ -25,7 +25,7 @@
 package com.iqiyi.android.qigsaw.core.splitrequest.splitinfo;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.TextUtils;
 
 import com.iqiyi.android.qigsaw.core.common.FileUtil;
@@ -48,25 +48,29 @@ final class SplitInfoVersionManagerImpl implements SplitInfoVersionManager {
 
     private String currentVersion;
 
-    static SplitInfoVersionManager createSplitInfoVersionManager(Context context) {
+    private boolean isMainProcess;
+
+    static SplitInfoVersionManager createSplitInfoVersionManager(Context context, boolean isMainProcess) {
         String defaultVersion = SplitBaseInfoProvider.getDefaultSplitInfoVersion();
         String qigsawId = SplitBaseInfoProvider.getQigsawId();
-        return new SplitInfoVersionManagerImpl(context, defaultVersion, qigsawId);
+        return new SplitInfoVersionManagerImpl(context, isMainProcess, defaultVersion, qigsawId);
     }
 
     private SplitInfoVersionManagerImpl(
             Context context,
+            boolean isMainProcess,
             String defaultVersion,
             String qigsawId) {
         this.defaultVersion = defaultVersion;
+        this.isMainProcess = isMainProcess;
         File baseRootDir = new File(context.getDir(SplitConstants.QIGSAW, Context.MODE_PRIVATE), qigsawId);
         this.rootDir = new File(baseRootDir, SPLIT_ROOT_DIR_NAME);
         processVersionData(context);
-        reportNewSplitInfoVersionLoaded(context);
+        reportNewSplitInfoVersionLoaded();
     }
 
-    private void reportNewSplitInfoVersionLoaded(Context context) {
-        if (ProcessUtil.isMainProcess(context)) {
+    private void reportNewSplitInfoVersionLoaded() {
+        if (isMainProcess) {
             if (!TextUtils.equals(currentVersion, defaultVersion)) {
                 SplitUpdateReporter updateReporter = SplitUpdateReporterManager.getUpdateReporter();
                 if (updateReporter != null) {
@@ -88,7 +92,7 @@ final class SplitInfoVersionManagerImpl implements SplitInfoVersionManager {
                 SplitLog.i(TAG, "Splits have been updated, so we use new split info version %s.", newVersion);
                 currentVersion = newVersion;
             } else {
-                if (ProcessUtil.isMainProcess(context)) {
+                if (isMainProcess) {
                     if (updateVersionData(new SplitInfoVersionData(newVersion, newVersion))) {
                         currentVersion = newVersion;
                         ProcessUtil.killAllOtherProcess(context);

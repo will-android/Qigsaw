@@ -25,9 +25,11 @@
 package com.iqiyi.android.qigsaw.core.splitrequest.splitinfo;
 
 import android.content.Context;
-import android.support.annotation.RestrictTo;
+
+import androidx.annotation.RestrictTo;
 
 import com.iqiyi.android.qigsaw.core.common.FileUtil;
+import com.iqiyi.android.qigsaw.core.common.OEMCompat;
 import com.iqiyi.android.qigsaw.core.common.SplitBaseInfoProvider;
 import com.iqiyi.android.qigsaw.core.common.SplitConstants;
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
@@ -35,7 +37,7 @@ import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public final class SplitPathManager {
@@ -91,6 +93,39 @@ public final class SplitPathManager {
         return splitDir;
     }
 
+    public File getUninstallSplitsDir() {
+        File uninstallSplitsDir = new File(rootDir, "uninstall");
+        if (!uninstallSplitsDir.exists()) {
+            uninstallSplitsDir.mkdirs();
+        }
+        return uninstallSplitsDir;
+    }
+
+    /**
+     * Get mark file for split, if file is existed, indicate the split has been installed.
+     *
+     * @param info split info.
+     */
+    public File getSplitMarkFile(SplitInfo info) {
+        File splitDir = getSplitDir(info);
+        return new File(splitDir, info.getMd5());
+    }
+
+    /**
+     * Get special mark file for split(), if file is existed, indicate the split has been installed.
+     *
+     * @param info split info.
+     */
+    public File getSplitSpecialMarkFile(SplitInfo info) {
+        File splitDir = getSplitDir(info);
+        return new File(splitDir, info.getMd5() + ".ov");
+    }
+
+    public File getSplitSpecialLockFile(SplitInfo info) {
+        File splitDir = getSplitDir(info);
+        return new File(splitDir, "ov.lock");
+    }
+
     /**
      * get storage path of split optimized dex
      *
@@ -100,7 +135,11 @@ public final class SplitPathManager {
         File splitDir = getSplitDir(info);
         File optDir = new File(splitDir, "oat");
         if (!optDir.exists()) {
-            optDir.mkdirs();
+            if (optDir.mkdirs()) {
+                //individual user report exception for "java.lang.IllegalArgumentException: optimizedDirectory not readable/writable:......"
+                optDir.setWritable(true);
+                optDir.setReadable(true);
+            }
         }
         return optDir;
     }

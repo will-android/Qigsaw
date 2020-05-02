@@ -24,9 +24,6 @@
 
 package com.iqiyi.android.qigsaw.core.splitinstall;
 
-
-import android.content.Context;
-
 import com.iqiyi.android.qigsaw.core.splitdownload.DownloadCallback;
 import com.iqiyi.android.qigsaw.core.splitrequest.splitinfo.SplitInfo;
 
@@ -40,21 +37,17 @@ final class StartDownloadCallback implements DownloadCallback {
 
     private final SplitInstallSessionManager sessionManager;
 
-    private final List<String> moduleNames;
-
     private final List<SplitInfo> splitInfoList;
 
     private final SplitSessionInstaller installer;
 
-    StartDownloadCallback(Context context,
+    StartDownloadCallback(SplitInstaller splitInstaller,
                           int sessionId,
                           SplitInstallSessionManager sessionManager,
-                          List<String> moduleNames,
                           List<SplitInfo> splitInfoList) {
         this.sessionId = sessionId;
         this.sessionManager = sessionManager;
-        this.installer = new SplitSessionInstallerImpl(context, sessionManager, SplitBackgroundExecutor.getExecutor());
-        this.moduleNames = moduleNames;
+        this.installer = new SplitSessionInstallerImpl(splitInstaller, sessionManager, SplitBackgroundExecutor.getExecutor());
         this.splitInfoList = splitInfoList;
         this.sessionState = sessionManager.getSessionState(sessionId);
     }
@@ -99,7 +92,7 @@ final class StartDownloadCallback implements DownloadCallback {
     }
 
     private void onInstall() {
-        installer.install(sessionId, moduleNames, splitInfoList);
+        installer.install(sessionId, splitInfoList);
     }
 
     private void broadcastSessionStatusChange() {

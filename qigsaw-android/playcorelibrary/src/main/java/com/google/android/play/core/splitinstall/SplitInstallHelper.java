@@ -2,15 +2,17 @@ package com.google.android.play.core.splitinstall;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Application;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 
 import com.iqiyi.android.qigsaw.core.splitload.SplitCompatResourcesLoader;
+import com.iqiyi.android.qigsaw.core.splitload.SplitLibraryLoaderHelper;
 
 import java.io.File;
 
@@ -47,7 +49,7 @@ public class SplitInstallHelper {
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public static void loadResources(Service service) {
         try {
-            SplitCompatResourcesLoader.loadResources(service);
+            SplitCompatResourcesLoader.loadResources(service, service.getBaseContext().getResources());
         } catch (Throwable throwable) {
             throw new RuntimeException("Failed to load service resources", throwable);
         }
@@ -66,7 +68,7 @@ public class SplitInstallHelper {
         if (context.getClass().getSimpleName().equals("ReceiverRestrictedContext")) {
             try {
                 Context base = ((ContextWrapper) context).getBaseContext();
-                SplitCompatResourcesLoader.loadResources(receiver, base, context.getResources());
+                SplitCompatResourcesLoader.loadResources(base, context.getResources());
             } catch (Throwable throwable) {
                 throw new RuntimeException("Failed to load receiver resources", throwable);
             }
@@ -82,9 +84,15 @@ public class SplitInstallHelper {
 
     /**
      * Loads native library using classloader or full path if library is not available in the class path.
+     *
+     * @param context Under {@link com.iqiyi.android.qigsaw.core.splitload.SplitLoad#MULTIPLE_CLASSLOADER} mode,
+     *                if context is {@link Application}, load split's library for base apk, otherwise for split apk.
      */
     @SuppressLint("UnsafeDynamicallyLoadedCode")
     public static void loadLibrary(Context context, String libraryName) {
+        if (SplitLibraryLoaderHelper.loadSplitLibrary(context, libraryName)) {
+            return;
+        }
         try {
             System.loadLibrary(libraryName);
         } catch (UnsatisfiedLinkError error) {

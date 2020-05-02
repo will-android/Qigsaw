@@ -24,8 +24,6 @@
 
 package com.iqiyi.android.qigsaw.core.splitinstall;
 
-import android.content.Context;
-
 import com.iqiyi.android.qigsaw.core.splitdownload.DownloadCallback;
 import com.iqiyi.android.qigsaw.core.splitrequest.splitinfo.SplitInfo;
 
@@ -33,18 +31,14 @@ import java.util.List;
 
 final class DeferredDownloadCallback implements DownloadCallback {
 
-    private final SplitInstaller installer;
+    private final SplitInstaller splitInstaller;
 
     private final List<SplitInfo> splitInfoList;
 
-    private final List<String> moduleNames;
-
-    DeferredDownloadCallback(Context context,
-                             List<String> moduleNames,
+    DeferredDownloadCallback(SplitInstaller splitInstaller,
                              List<SplitInfo> splitInfoList) {
-        this.moduleNames = moduleNames;
         this.splitInfoList = splitInfoList;
-        this.installer = new SplitInstallerImpl(context);
+        this.splitInstaller = splitInstaller;
     }
 
     @Override
@@ -69,7 +63,7 @@ final class DeferredDownloadCallback implements DownloadCallback {
 
     @Override
     public void onCompleted() {
-        SplitBackgroundExecutor.getExecutor().execute(new SplitDeferredInstallTask(installer, moduleNames, splitInfoList));
+        SplitBackgroundExecutor.getExecutor().execute(new SplitDeferredInstallTask(splitInstaller, splitInfoList));
     }
 
     @Override

@@ -24,36 +24,18 @@
 
 package com.iqiyi.android.qigsaw.core.splitinstall;
 
-import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallError;
 import com.iqiyi.android.qigsaw.core.splitrequest.splitinfo.SplitInfo;
 
 import java.util.Collection;
-import java.util.List;
 
 final class SplitDeferredInstallTask extends SplitInstallTask {
 
-    SplitDeferredInstallTask(SplitInstaller installer, List<String> moduleNames, Collection<SplitInfo> needUpdateSplits) {
-        super(installer, moduleNames, needUpdateSplits);
+    SplitDeferredInstallTask(SplitInstaller installer, Collection<SplitInfo> needUpdateSplits) {
+        super(installer, needUpdateSplits);
     }
 
     @Override
-    boolean continueInstallIgnoreError() {
-        return true;
+    boolean isStartInstallOperation() {
+        return false;
     }
-
-    @Override
-    void onInstallCompleted(List<SplitInstaller.InstallResult> installResults, long cost) {
-        if (SplitInstallReporterManager.getInstallReporter() != null) {
-            SplitInstallReporterManager.getInstallReporter().onDeferredInstallOK(moduleNames, cost);
-        }
-    }
-
-    @Override
-    void onInstallFailed(List<SplitInstallError> errors, long cost) {
-        if (SplitInstallReporterManager.getInstallReporter() != null) {
-            SplitInstallReporterManager.getInstallReporter().onDeferredInstallFailed(moduleNames, errors, cost);
-        }
-    }
-
-
 }

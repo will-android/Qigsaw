@@ -24,21 +24,22 @@
 
 package com.iqiyi.android.qigsaw.core.splitinstall;
 
-import android.support.annotation.Nullable;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
 
 import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallReporter;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public class SplitInstallReporterManager {
 
     private static final AtomicReference<SplitInstallReporter> sInstallReporterRef = new AtomicReference<>();
 
-    public static void install(@Nullable SplitInstallReporter installReporter) {
+    public static void install(@NonNull SplitInstallReporter installReporter) {
         sInstallReporterRef.compareAndSet(null, installReporter);
     }
 

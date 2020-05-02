@@ -24,8 +24,9 @@
 
 package com.iqiyi.android.qigsaw.core.splitinstall;
 
-import com.iqiyi.android.qigsaw.core.common.SplitLog;
+import com.iqiyi.android.qigsaw.core.splitreport.SplitBriefInfo;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallError;
+import com.iqiyi.android.qigsaw.core.splitreport.SplitInstallReporter;
 import com.iqiyi.android.qigsaw.core.splitrequest.splitinfo.SplitInfo;
 
 import java.util.ArrayList;
@@ -34,48 +35,61 @@ import java.util.List;
 
 abstract class SplitInstallTask implements Runnable {
 
-    private static final String TAG = "SplitInstallTask";
-
     private final SplitInstaller installer;
 
     private final Collection<SplitInfo> needUpdateSplits;
 
-    final List<String> moduleNames;
-
     SplitInstallTask(SplitInstaller installer,
-                     List<String> moduleNames,
                      Collection<SplitInfo> needUpdateSplits) {
         this.installer = installer;
-        this.moduleNames = moduleNames;
         this.needUpdateSplits = needUpdateSplits;
     }
 
-    abstract boolean continueInstallIgnoreError();
+    abstract boolean isStartInstallOperation();
 
     @Override
     public final void run() {
         onPreInstall();
         long currentTime = System.currentTimeMillis();
-        List<SplitInstaller.InstallResult> installResults = new ArrayList<>();
-        List<SplitInstallError> installErrors = new ArrayList<>(0);
         boolean installCompleted = true;
+        boolean isStartInstall = isStartInstallOperation();
+        List<SplitInstaller.InstallResult> installResults = new ArrayList<>();
+        List<SplitBriefInfo> installedSplits = new ArrayList<>(needUpdateSplits.size());
+        List<SplitInstallError> installErrors = new ArrayList<>();
         for (SplitInfo info : needUpdateSplits) {
+            SplitBriefInfo briefInfo = new SplitBriefInfo(info.getSplitName(), info.getSplitVersion(), info.isBuiltIn());
             try {
-                SplitInstaller.InstallResult installResult = installer.install(info);
+                SplitInstaller.InstallResult installResult = installer.install(isStartInstall, info);
+                briefInfo.setInstallFlag(installResult.firstInstalled ? SplitBriefInfo.FIRST_INSTALLED : SplitBriefInfo.ALREADY_INSTALLED);
+                installedSplits.add(briefInfo);
                 installResults.add(installResult);
             } catch (SplitInstaller.InstallException error) {
-                SplitLog.printErrStackTrace(TAG, error, "Failed to install split " + info.getSplitName());
                 installCompleted = false;
-                installErrors.add(new SplitInstallError(info.getSplitName(), error.getErrorCode(), error.getCause()));
-                if (!continueInstallIgnoreError()) {
+                installErrors.add(new SplitInstallError(briefInfo, error.getErrorCode(), error.getCause()));
+                if (isStartInstall) {
                     break;
                 }
             }
         }
+        SplitInstallReporter installReporter = SplitInstallReporterManager.getInstallReporter();
         if (installCompleted) {
-            onInstallCompleted(installResults, System.currentTimeMillis() - currentTime);
+            onInstallCompleted(installResults);
+            if (installReporter != null) {
+                if (isStartInstall) {
+                    installReporter.onStartInstallOK(installedSplits, System.currentTimeMillis() - currentTime);
+                } else {
+                    installReporter.onDeferredInstallOK(installedSplits, System.currentTimeMillis() - currentTime);
+                }
+            }
         } else {
-            onInstallFailed(installErrors, System.currentTimeMillis() - currentTime);
+            onInstallFailed(installErrors);
+            if (installReporter != null) {
+                if (isStartInstall) {
+                    installReporter.onStartInstallFailed(installedSplits, installErrors.get(0), System.currentTimeMillis() - currentTime);
+                } else {
+                    installReporter.onDeferredInstallFailed(installedSplits, installErrors, System.currentTimeMillis() - currentTime);
+                }
+            }
         }
     }
 
@@ -83,8 +97,12 @@ abstract class SplitInstallTask implements Runnable {
 
     }
 
-    abstract void onInstallCompleted(List<SplitInstaller.InstallResult> installResults, long cost);
+    void onInstallCompleted(List<SplitInstaller.InstallResult> installResults) {
 
-    abstract void onInstallFailed(List<SplitInstallError> errors, long cost);
+    }
+
+    void onInstallFailed(List<SplitInstallError> errors) {
+
+    }
 
 }

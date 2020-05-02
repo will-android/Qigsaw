@@ -24,6 +24,9 @@
 
 package com.iqiyi.android.qigsaw.core.splitreport;
 
+import androidx.annotation.MainThread;
+import androidx.annotation.NonNull;
+
 import java.util.List;
 
 /**
@@ -34,20 +37,22 @@ public interface SplitLoadReporter {
     /**
      * When all modules are loaded successfully, this method would be invoked.
      *
-     * @param requestModuleNames modules need to be loaded.
-     * @param processName        current process name.
-     * @param cost               time in ms.
+     * @param processName  current process name.
+     * @param loadedSplits splits which have been loaded successfully.
+     * @param cost         time in ms.
      */
-    void onLoadOK(List<String> requestModuleNames, String processName, long cost);
+    @MainThread
+    void onLoadOK(String processName, @NonNull List<SplitBriefInfo> loadedSplits, long cost);
 
     /**
      * When all modules are loaded completely, and at least one module failed, this method will be invoked.
      *
-     * @param requestModuleNames modules need to be loaded.
-     * @param processName        current process name.
-     * @param errors             a list of {@link SplitLoadError}
-     * @param cost               time in ms.
+     * @param processName  current process name.
+     * @param loadedSplits splits which have been loaded successfully, maybe empty.
+     * @param errors       splits which have been loaded unsuccessfully.
+     * @param cost         time in ms.
      */
-    void onLoadFailed(List<String> requestModuleNames, String processName, List<SplitLoadError> errors, long cost);
+    @MainThread
+    void onLoadFailed(String processName, @NonNull List<SplitBriefInfo> loadedSplits, @NonNull List<SplitLoadError> errors, long cost);
 
 }

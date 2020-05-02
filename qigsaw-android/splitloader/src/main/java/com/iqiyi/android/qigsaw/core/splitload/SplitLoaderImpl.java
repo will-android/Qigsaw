@@ -25,15 +25,11 @@
 package com.iqiyi.android.qigsaw.core.splitload;
 
 import android.content.Context;
-import android.content.Intent;
-import android.text.TextUtils;
+import androidx.annotation.Nullable;
 
-import com.iqiyi.android.qigsaw.core.common.SplitConstants;
-import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import com.iqiyi.android.qigsaw.core.splitreport.SplitLoadError;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 
 final class SplitLoaderImpl extends SplitLoader {
@@ -43,61 +39,15 @@ final class SplitLoaderImpl extends SplitLoader {
     }
 
     @Override
-    public void load(ClassLoader classLoader, Intent splitFileIntent) throws SplitLoadException {
-        String splitApk = splitFileIntent.getStringExtra(SplitConstants.KEY_APK);
-        String splitOptDir = splitFileIntent.getStringExtra(SplitConstants.KEY_OPTIMIZED_DIRECTORY);
-        String splitLibPath = splitFileIntent.getStringExtra(SplitConstants.KEY_NATIVE_LIBRARIES);
-        List<String> splitMultiDex = splitFileIntent.getStringArrayListExtra(SplitConstants.KEY_MULTI_DEX);
-        List<String> dexPaths = new ArrayList<>();
-        dexPaths.add(splitApk);
-        if (splitMultiDex != null) {
-            dexPaths.addAll(splitMultiDex);
-        }
-        loadResources(splitApk);
-        loadNativePath(classLoader, splitLibPath);
-        loadDex(classLoader, splitOptDir, dexPaths);
-    }
-
-    @Override
-    protected void loadResources(String splitResDir) throws SplitLoadException {
+    SplitDexClassLoader loadCode(String moduleNames,
+                                 @Nullable List<String> dexPaths,
+                                 File optimizedDirectory,
+                                 @Nullable File librarySearchPath,
+                                 @Nullable List<String> dependencies) throws SplitLoadException {
         try {
-            SplitCompatResourcesLoader.loadResources(context, context.getResources(), splitResDir);
-            Context base = getBaseContext();
-            try {
-                installSplitResourceDir(base, splitResDir);
-            } catch (Throwable ignored) {
-
-            }
-        } catch (Throwable throwable) {
-            throw new SplitLoadException(SplitLoadError.LOAD_RES_FAILED, throwable);
-        }
-    }
-
-    @Override
-    protected void loadNativePath(ClassLoader classLoader, String libPath) throws SplitLoadException {
-        if (!TextUtils.isEmpty(libPath)) {
-            try {
-                SplitCompatLibraryLoader.load(classLoader, new File(libPath));
-            } catch (Throwable throwable) {
-                throw new SplitLoadException(SplitLoadError.LOAD_LIB_FAILED, throwable);
-            }
-        }
-    }
-
-    @Override
-    protected void loadDex(ClassLoader classLoader, String optDir, List<String> dexPaths) throws SplitLoadException {
-        if (!TextUtils.isEmpty(optDir)) {
-            List<File> dexFiles = new ArrayList<>(dexPaths.size());
-            for (String dexPath : dexPaths) {
-                dexFiles.add(new File(dexPath));
-            }
-            try {
-                SplitCompatDexLoader.load(classLoader, new File(optDir), dexFiles);
-            } catch (Throwable throwable) {
-                throw new SplitLoadException(SplitLoadError.LOAD_DEX_FAILED, throwable);
-            }
-        } else {
-            SplitLog.i(TAG, "No dexes are needed to load!");
+            return SplitDexClassLoader.create(moduleNames, dexPaths, optimizedDirectory, librarySearchPath, dependencies);
+        } catch (Throwable e) {
+            throw new SplitLoadException(SplitLoadError.CREATE_CLASSLOADER_FAILED, e);
         }
     }
 }

@@ -25,11 +25,10 @@
 package com.iqiyi.android.qigsaw.core.splitreport;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.iqiyi.android.qigsaw.core.common.SplitLog;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class DefaultSplitInstallReporter implements SplitInstallReporter {
@@ -43,32 +42,26 @@ public class DefaultSplitInstallReporter implements SplitInstallReporter {
     }
 
     @Override
-    public void onStartInstallOK(List<String> requestModuleNames, long cost) {
-        SplitLog.i(TAG, "Start install %s OK, cost time %d ms.", requestModuleNames.toString(), cost);
+    public void onStartInstallOK(@NonNull List<SplitBriefInfo> installedSplits, long cost) {
+        SplitLog.i(TAG, "Start install %s OK, cost time %d ms.", installedSplits.toString(), cost);
     }
 
     @Override
-    public void onStartInstallFailed(List<String> requestModuleNames, @NonNull SplitInstallError error, long cost) {
-        SplitLog.w(TAG, "Start install splits %s but %s installed failed, cost time %d ms.",
-                requestModuleNames.toString(),
-                error.getModuleName(),
-                cost
-        );
-        SplitLog.w(TAG, error.toString());
+    public void onStartInstallFailed(@NonNull List<SplitBriefInfo> installedSplits, @NonNull SplitInstallError error, long cost) {
+        SplitLog.printErrStackTrace(TAG, error.cause, "Start to install split %s failed, cost time %d ms.", error.splitName, cost);
     }
 
     @Override
-    public void onDeferredInstallOK(List<String> requestModuleNames, long cost) {
-        SplitLog.i(TAG, "Deferred install %s OK, cost time %d ms.", requestModuleNames.toString(), cost);
+    public void onDeferredInstallOK(@NonNull List<SplitBriefInfo> installedSplits, long cost) {
+        SplitLog.i(TAG, "Deferred install %s OK, cost time %d ms.", installedSplits.toString(), cost);
     }
 
     @Override
-    public void onDeferredInstallFailed(List<String> requestModuleNames, @NonNull List<SplitInstallError> errors, long cost) {
-        List<String> errorModuleNames = new ArrayList<>(errors.size());
-        for (SplitInstallError error : errors) {
-            errorModuleNames.add(error.getModuleName());
+    public void onDeferredInstallFailed(@NonNull List<SplitBriefInfo> installedSplits, @NonNull List<SplitInstallError> errors, long cost) {
+        for (SplitInstallError installError : errors) {
+            SplitLog.printErrStackTrace(TAG, installError.cause,
+                    "Defer to install split %s failed with error code %d, cost time %d ms.",
+                    installError.splitName, installError.errorCode, cost);
         }
-        SplitLog.w(TAG, "Deferred install splits %s but %s installed failed, cost time %d ms.", requestModuleNames.toString(), errorModuleNames.toString(), cost);
-        SplitLog.w(TAG, errors.toString());
     }
 }

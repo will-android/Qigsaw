@@ -24,39 +24,14 @@
 
 package com.iqiyi.qigsaw.buildtool.gradle.internal.tool
 
-import java.nio.charset.Charset
+import com.google.gson.Gson
+
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
-import java.util.regex.Matcher
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
 
 class FileUtils {
 
-    static void unZipFile(File zipFile, String descDir) throws IOException {
-        ZipFile zip = new ZipFile(zipFile, Charset.forName("GBK"))
-        for (Enumeration<? extends ZipEntry> entries = zip.entries(); entries.hasMoreElements();) {
-            ZipEntry entry = (ZipEntry) entries.nextElement()
-            String zipEntryName = entry.getName()
-            InputStream is = zip.getInputStream(entry)
-            String outPath = (descDir + File.separator + zipEntryName).replaceAll("/", Matcher.quoteReplacement(File.separator))
-            File file = new File(outPath.substring(0, outPath.lastIndexOf(File.separator)))
-            if (!file.exists()) {
-                file.mkdirs()
-            }
-            if (new File(outPath).isDirectory()) {
-                continue
-            }
-            FileOutputStream out = new FileOutputStream(outPath)
-            byte[] buf1 = new byte[2048]
-            int len
-            while ((len = is.read(buf1)) > 0) {
-                out.write(buf1, 0, len)
-            }
-            closeQuietly(is)
-            closeQuietly(out)
-        }
-    }
+    static final int BUFFER = 8192
 
     static String getMD5(File file) {
         MessageDigest digest
@@ -72,7 +47,7 @@ class FileUtils {
             return null
         }
 
-        byte[] buffer = new byte[8192]
+        byte[] buffer = new byte[BUFFER]
         int read
         try {
             while ((read = is.read(buffer)) > 0) {
@@ -91,12 +66,28 @@ class FileUtils {
         }
     }
 
+    static boolean createFileForTypeClass(Object typeClass, File dest) {
+        try {
+            Gson gson = new Gson()
+            String splitDetailsStr = gson.toJson(typeClass)
+            dest.createNewFile()
+            BufferedOutputStream osm = new BufferedOutputStream(new FileOutputStream(dest))
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(osm))
+            writer.write(splitDetailsStr)
+            writer.close()
+            osm.close()
+        } catch (Throwable e) {
+            return false
+        }
+        return true
+    }
+
     static void copyFile(InputStream source, OutputStream dest)
             throws IOException {
         InputStream is = source
         OutputStream os = dest
         try {
-            byte[] buffer = new byte[1024]
+            byte[] buffer = new byte[BUFFER]
             int length
             while ((length = is.read(buffer)) > 0) {
                 os.write(buffer, 0, length)
@@ -107,10 +98,17 @@ class FileUtils {
         }
     }
 
+    static void copyFile(File source, File dest, boolean log)
+            throws IOException {
+        copyFile(new FileInputStream(source), new FileOutputStream(dest))
+        if (log) {
+            QigsawLogger.w("Succeed to copy ${source.absolutePath} to ${dest.absolutePath}")
+        }
+    }
 
     static void copyFile(File source, File dest)
             throws IOException {
-        copyFile(new FileInputStream(source), new FileOutputStream(dest))
+        copyFile(source, dest, true)
     }
 
     static void closeQuietly(Closeable obj) {

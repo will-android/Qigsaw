@@ -25,11 +25,11 @@
 package com.iqiyi.android.qigsaw.core.splitload;
 
 import android.content.Context;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 /**
  * Create and manage {@link SplitLoadManager} instance.
@@ -40,12 +40,13 @@ public class SplitLoadManagerService {
     private static final AtomicReference<SplitLoadManager> sReference = new AtomicReference<>();
 
     public static void install(Context context,
-                               String[] processes,
-                               boolean loadInstalledSplitsOnApplicationCreate,
-                               boolean isAAB) {
-        if (sReference.get() == null) {
-            sReference.set(create(context, processes, loadInstalledSplitsOnApplicationCreate, isAAB));
-        }
+                               int splitLoadMode,
+                               boolean qigsawMode,
+                               boolean isMainProcess,
+                               String currentProcessName,
+                               String[] workProcesses,
+                               String[] forbiddenWorkProcesses) {
+        sReference.set(create(context, splitLoadMode, qigsawMode, isMainProcess, currentProcessName, workProcesses, forbiddenWorkProcesses));
     }
 
     public static boolean hasInstance() {
@@ -60,9 +61,12 @@ public class SplitLoadManagerService {
     }
 
     private static SplitLoadManager create(Context context,
-                                           String[] processes,
-                                           boolean loadInstalledSplitsOnApplicationCreate,
-                                           boolean isAAB) {
-        return new SplitLoadManagerImpl(context, processes, loadInstalledSplitsOnApplicationCreate, isAAB);
+                                           int splitLoadMode,
+                                           boolean qigsawMode,
+                                           boolean isMainProcess,
+                                           String currentProcessName,
+                                           String[] workProcesses,
+                                           String[] forbiddenWorkProcesses) {
+        return new SplitLoadManagerImpl(context, splitLoadMode, qigsawMode, isMainProcess, currentProcessName, workProcesses, forbiddenWorkProcesses);
     }
 }

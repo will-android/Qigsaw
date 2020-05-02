@@ -28,51 +28,55 @@ import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.support.annotation.Nullable;
-import android.support.annotation.RestrictTo;
-import android.support.v4.util.ArraySet;
 
-import com.iqiyi.android.qigsaw.core.common.ProcessUtil;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
+
+import com.iqiyi.android.qigsaw.core.common.SplitLog;
 import com.iqiyi.android.qigsaw.core.splitload.listener.OnSplitLoadListener;
 
+import java.io.File;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import dalvik.system.PathClassLoader;
-
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public abstract class SplitLoadManager {
 
+    protected static final String TAG = "SplitLoadManager";
+
     private final Context context;
 
-    private final Set<Split> loadedSplits = new ArraySet<>();
+    private final Set<Split> loadedSplits = new HashSet<>(0);
 
-    private final Set<String> loadedSplitNames = new ArraySet<>();
+    private final Set<String> loadedSplitNames = new HashSet<>(0);
 
-    private final String currentProcessName;
+    private final Set<String> loadedSplitApkPaths = new HashSet<>(0);
 
-    private final Set<String> loadedSplitApkPaths = new ArraySet<>();
+    final String currentProcessName;
 
-    private final String[] processes;
+    final int splitLoadMode;
 
-    SplitLoadManager(Context context, String[] processes) {
+    SplitLoadManager(Context context,
+                     String currentProcessName,
+                     int splitLoadMode) {
         this.context = context;
-        this.currentProcessName = ProcessUtil.getProcessName(context);
-        this.processes = processes;
+        this.currentProcessName = currentProcessName;
+        this.splitLoadMode = splitLoadMode;
     }
 
     /**
      * Hook PathClassloader if need
      */
-    public abstract void injectPathClassloaderIfNeed(boolean needHookClassLoader);
+    public abstract void injectPathClassloader();
 
     /**
-     * Called this method in {@link Application#onCreate()}.
+     * Load all installed splits when application launches.
      */
-    public abstract void onCreate();
+    public abstract void loadInstalledSplitsWhenAppLaunches();
 
     /**
      * Called this method in {@link Application#getResources()}.
@@ -92,12 +96,23 @@ public abstract class SplitLoadManager {
     public abstract Runnable createSplitLoadTask(List<Intent> splitFileIntents, @Nullable OnSplitLoadListener loadListener);
 
     /**
+     * Using to load all installed splits.
+     */
+    public abstract void loadInstalledSplits();
+
+    /**
      * Get names of loaded splits
      *
      * @return a list of loaded split names.
      */
     public Set<String> getLoadedSplitNames() {
-        return loadedSplitNames;
+        synchronized (this) {
+            return loadedSplitNames;
+        }
+    }
+
+    public int splitLoadMode() {
+        return splitLoadMode;
     }
 
     /**
@@ -106,23 +121,18 @@ public abstract class SplitLoadManager {
      * @return a list of loaded split apk file path.
      */
     Set<String> getLoadedSplitApkPaths() {
-        return loadedSplitApkPaths;
-    }
-
-    public abstract void loadInstalledSplits();
-
-    abstract PathClassLoader getInjectedClassloader();
-
-    String getCurrentProcessName() {
-        return currentProcessName;
-    }
-
-    boolean hasWorkProcess() {
-        return processes != null && processes.length > 0;
-    }
-
-    String[] getWorkProcesses() {
-        return processes;
+        synchronized (this) {
+            Set<String> loadedSplitApkPathsInsure = new HashSet<>(loadedSplitApkPaths.size());
+            for (String path : loadedSplitApkPaths) {
+                File file = new File(path);
+                if (file.exists() && file.isFile()) {
+                    loadedSplitApkPathsInsure.add(path);
+                } else {
+                    SplitLog.w(TAG, "Split has been loaded, but its file %s is not exist!", path);
+                }
+            }
+            return loadedSplitApkPathsInsure;
+        }
     }
 
     Context getContext() {
@@ -130,16 +140,19 @@ public abstract class SplitLoadManager {
     }
 
     final void putSplits(Collection<Split> splits) {
-        loadedSplits.addAll(splits);
-        for (Split split : splits) {
-            loadedSplitNames.add(split.splitName);
-            loadedSplitApkPaths.add(split.splitApkPath);
+        synchronized (this) {
+            loadedSplits.addAll(splits);
+            for (Split split : splits) {
+                loadedSplitNames.add(split.splitName);
+                loadedSplitApkPaths.add(split.splitApkPath);
+            }
         }
     }
 
     final Set<Split> getLoadedSplits() {
-        return loadedSplits;
+        synchronized (this) {
+            return loadedSplits;
+        }
     }
-
 
 }

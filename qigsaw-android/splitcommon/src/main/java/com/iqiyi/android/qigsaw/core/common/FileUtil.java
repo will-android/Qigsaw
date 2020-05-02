@@ -1,9 +1,10 @@
 package com.iqiyi.android.qigsaw.core.common;
 
-
 import android.annotation.SuppressLint;
 import android.os.Build;
-import android.support.annotation.RestrictTo;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.RestrictTo;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -17,7 +18,7 @@ import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.zip.ZipFile;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public class FileUtil {
@@ -26,7 +27,7 @@ public class FileUtil {
 
     }
 
-    private static final String TAG = "SplitFileUtil";
+    private static final String TAG = "Split.FileUtil";
 
     public static void copyFile(InputStream input, OutputStream output) throws IOException {
         BufferedInputStream bufferedInput = new BufferedInputStream(input);
@@ -41,6 +42,87 @@ public class FileUtil {
             closeQuietly(input);
             closeQuietly(output);
         }
+    }
+
+    public static void createFileSafely(@NonNull File file) throws IOException {
+        if (!file.exists()) {
+            boolean isCreationSuccessful = false;
+            int numAttempts = 0;
+            Exception cause = null;
+            while (numAttempts < SplitConstants.MAX_RETRY_ATTEMPTS && !isCreationSuccessful) {
+                numAttempts++;
+                try {
+                    if (!file.createNewFile()) {
+                        SplitLog.w(TAG, "File %s already exists", file.getAbsolutePath());
+                    }
+                    isCreationSuccessful = true;
+                } catch (Exception e) {
+                    isCreationSuccessful = false;
+                    cause = e;
+                }
+            }
+            if (!isCreationSuccessful) {
+                throw new IOException("Failed to create file " + file.getAbsolutePath(), cause);
+            } else {
+                SplitLog.v(TAG, "Succeed to create file " + file.getAbsolutePath());
+            }
+        }
+    }
+
+    public static synchronized boolean deleteFileSafelyLock(@NonNull File file, File lockFile) throws IOException {
+        if (!file.exists()) {
+            return true;
+        }
+        FileLockHelper fileLock = null;
+        boolean ret;
+        try {
+            fileLock = FileLockHelper.getFileLock(lockFile);
+            ret = deleteFileSafely(file);
+        } catch (IOException e) {
+            throw new IOException("Failed to lock file " + lockFile.getAbsolutePath());
+        } finally {
+            if (lockFile != null) {
+                closeQuietly(fileLock);
+            }
+        }
+        return ret;
+    }
+
+    public static synchronized void createFileSafelyLock(@NonNull File file, File lockFile) throws IOException {
+        if (file.exists()) {
+            return;
+        }
+        FileLockHelper fileLock = null;
+        try {
+            fileLock = FileLockHelper.getFileLock(lockFile);
+            try {
+                createFileSafely(file);
+            } catch (IOException e) {
+                throw new IOException("Failed to create file " + file.getAbsolutePath());
+            }
+        } catch (IOException e) {
+            throw new IOException("Failed to lock file " + lockFile.getAbsolutePath());
+        } finally {
+            if (lockFile != null) {
+                closeQuietly(fileLock);
+            }
+        }
+    }
+
+    public static boolean deleteFileSafely(@NonNull File file) {
+        if (!file.exists()) {
+            return true;
+        }
+        boolean isDeleteSuccessful = false;
+        int numAttempts = 0;
+        while (numAttempts < SplitConstants.MAX_RETRY_ATTEMPTS && !isDeleteSuccessful) {
+            numAttempts++;
+            if (file.delete()) {
+                isDeleteSuccessful = true;
+            }
+        }
+        SplitLog.d(TAG, "%s to delete file: " + file.getAbsolutePath(), isDeleteSuccessful ? "Succeed" : "Failed");
+        return isDeleteSuccessful;
     }
 
     public static void copyFile(File source, File dest) throws IOException {
@@ -133,24 +215,6 @@ public class FileUtil {
         return file != null && file.exists() && file.canRead() && file.isFile() && file.length() > 0;
     }
 
-    public static boolean safeDeleteFile(File file) {
-        if (file == null) {
-            return true;
-        }
-
-        if (file.exists()) {
-            SplitLog.i(TAG, "safeDeleteFile, try to delete path: " + file.getPath());
-
-            boolean deleted = file.delete();
-            if (!deleted) {
-                SplitLog.e(TAG, "Failed to delete file, try to delete when exit. path: " + file.getPath());
-                file.deleteOnExit();
-            }
-            return deleted;
-        }
-        return true;
-    }
-
     public static boolean deleteDir(File file) {
         return deleteDir(file, true);
     }
@@ -160,7 +224,7 @@ public class FileUtil {
             return false;
         }
         if (file.isFile()) {
-            safeDeleteFile(file);
+            deleteFileSafely(file);
         } else if (file.isDirectory()) {
             File[] files = file.listFiles();
             if (files != null) {
@@ -168,7 +232,7 @@ public class FileUtil {
                     deleteDir(subFile);
                 }
                 if (deleteRootDir) {
-                    safeDeleteFile(file);
+                    deleteFileSafely(file);
                 }
             }
         }

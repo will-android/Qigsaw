@@ -25,28 +25,35 @@
 package com.iqiyi.android.qigsaw.core.extension;
 
 import android.app.Application;
+import android.content.Context;
+
+import java.util.List;
+import java.util.Map;
 
 interface AABExtensionManager {
 
     /**
      * Create {@link Application} instance for split.
      *
-     * @param splitName name of split
+     * @param classLoader used to load class
+     * @param splitName   name of split
      * @return {@link Application}
      */
-    Application createApplication(String splitName) throws AABExtensionException;
+    Application createApplication(ClassLoader classLoader, String splitName) throws AABExtensionException;
 
     /**
      * Invoke {@link Application#attach(android.content.Context)} method to activate split's application.
      *
-     * @param application application instance of split.
+     * @param splitApplication application instance of split.
      */
-    void activeApplication(Application application) throws AABExtensionException;
+    void activeApplication(Application splitApplication, Context appContext) throws AABExtensionException;
 
-    String getSplitNameForActivity(String name);
+    Map<String, List<String>> getSplitActivitiesMap();
 
-    String getSplitNameForService(String name);
+    boolean isSplitActivity(String name);
 
-    String getSplitNameForReceiver(String name);
+    boolean isSplitService(String name);
+
+    boolean isSplitReceiver(String name);
 
 }

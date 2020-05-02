@@ -24,7 +24,8 @@
 
 package com.iqiyi.android.qigsaw.core.splitreport;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
+import androidx.annotation.WorkerThread;
 
 import java.util.List;
 
@@ -38,31 +39,34 @@ public interface SplitInstallReporter {
      * When all modules are installed successfully,
      * this method will be invoked.
      *
-     * @param requestModuleNames module names that you request to install.
-     * @param cost               time in ms.
+     * @param installedSplits splits which have been installed successfully.
+     * @param cost            time in ms.
      */
-    void onStartInstallOK(List<String> requestModuleNames, long cost);
+    @WorkerThread
+    void onStartInstallOK(@NonNull List<SplitBriefInfo> installedSplits, long cost);
 
     /**
      * Using {@code startInstall} to install modules,
      * When one module is installed failed,
      * installation would be cancelled and this method will be invoked.
      *
-     * @param requestModuleNames module names that you request to install.
-     * @param error              {@link SplitInstallError}
-     * @param cost               time in ms.
+     * @param installedSplits splits which have been installed successfully, maybe empty.
+     * @param error           split which has been installed unsuccessfully.
+     * @param cost            time in ms.
      */
-    void onStartInstallFailed(List<String> requestModuleNames, @NonNull SplitInstallError error, long cost);
+    @WorkerThread
+    void onStartInstallFailed(@NonNull List<SplitBriefInfo> installedSplits, @NonNull SplitInstallError error, long cost);
 
     /**
      * Using {@code deferredInstall} to install modules.
      * When all modules are installed successfully,
      * this method will be invoked.
      *
-     * @param requestModuleNames module names that you request to install.
-     * @param cost               time in ms.
+     * @param installedSplits splits which have been installed successfully.
+     * @param cost            time in ms.
      */
-    void onDeferredInstallOK(List<String> requestModuleNames, long cost);
+    @WorkerThread
+    void onDeferredInstallOK(@NonNull List<SplitBriefInfo> installedSplits, long cost);
 
     /**
      * Using {@code deferredInstall} to install modules.
@@ -70,10 +74,11 @@ public interface SplitInstallReporter {
      * and at least one module failed,
      * this method will be invoked.
      *
-     * @param requestModuleNames module names that you request to install.
-     * @param errors             a list of {@link SplitInstallError}
-     * @param cost               time in ms.
+     * @param installedSplits splits which have been installed successfully, maybe empty.
+     * @param errors          splits which have been installed unsuccessfully.
+     * @param cost            time in ms.
      */
-    void onDeferredInstallFailed(List<String> requestModuleNames, @NonNull List<SplitInstallError> errors, long cost);
+    @WorkerThread
+    void onDeferredInstallFailed(@NonNull List<SplitBriefInfo> installedSplits, @NonNull List<SplitInstallError> errors, long cost);
 
 }

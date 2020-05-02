@@ -25,20 +25,20 @@
 package com.iqiyi.android.qigsaw.core.splitrequest.splitinfo;
 
 import android.content.Context;
-import android.support.annotation.Nullable;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import static android.support.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 
 @RestrictTo(LIBRARY_GROUP)
 public class SplitInfoManagerService {
 
     private static final AtomicReference<SplitInfoManager> sReference = new AtomicReference<>();
 
-    public static void install(Context context) {
-        sReference.compareAndSet(null, createSplitInfoManager(context));
+    public static void install(Context context, boolean isMainProcess) {
+        sReference.compareAndSet(null, createSplitInfoManager(context, isMainProcess));
     }
 
     @Nullable
@@ -46,8 +46,8 @@ public class SplitInfoManagerService {
         return sReference.get();
     }
 
-    private static SplitInfoManagerImpl createSplitInfoManager(Context context) {
-        SplitInfoVersionManager versionManager = SplitInfoVersionManagerImpl.createSplitInfoVersionManager(context);
+    private static SplitInfoManagerImpl createSplitInfoManager(Context context, boolean isMainProcess) {
+        SplitInfoVersionManager versionManager = SplitInfoVersionManagerImpl.createSplitInfoVersionManager(context, isMainProcess);
         SplitInfoManagerImpl infoManager = new SplitInfoManagerImpl();
         infoManager.attach(versionManager);
         return infoManager;
